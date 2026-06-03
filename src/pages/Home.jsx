@@ -178,8 +178,8 @@ export default function Home() {
       {/* SECCIÓN HERO (Principal) */}
       <section className="max-w-7xl mx-auto px-6 md:px-10 lg:px-20 pt-32 pb-20 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
         
-        {/* Columna Izquierda: Tarjeta de Información */}
-        <div className="bg-white dark:bg-[#1e293b] shadow-xl rounded-xl p-8 md:p-10 transition-all border border-slate-100 dark:border-transparent">
+        {/* Columna Izquierda: Tarjeta de Información (order-2 en móvil, order-1 en PC) */}
+        <div className="bg-white dark:bg-[#1e293b] shadow-xl rounded-xl p-8 md:p-10 transition-all border border-slate-100 dark:border-transparent order-2 md:order-1">
           
           <h2 className="text-[28px] md:text-3xl font-bold mb-6 text-slate-900 dark:text-white leading-tight">
             ¿Eres un Profesional de la Salud?
@@ -221,8 +221,8 @@ export default function Home() {
           </ul>
         </div>
 
-        {/* Columna Derecha: Ilustración */}
-        <div className="flex justify-center items-center">
+        {/* Columna Derecha: Ilustración (order-1 en móvil, order-2 en PC) */}
+        <div className="flex justify-center items-center order-1 md:order-2 mb-6 md:mb-0">
           <img 
             src="/InicioMedSys.svg" 
             alt="Doctores usando Soma"

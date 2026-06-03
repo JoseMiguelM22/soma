@@ -91,7 +91,7 @@ export default function Register() {
   };
 
   return (
-    <div className="bg-[#f7f9fc] dark:bg-slate-900 min-h-screen flex flex-col items-center pt-10 pb-10 transition-colors relative font-sans">
+    <div className="bg-[#f7f9fc] dark:bg-slate-900 min-h-screen flex flex-col items-center pt-20 pb-10 px-4 md:px-0 transition-colors relative font-sans">
       
       {/* Top Loader */}
       <div 
@@ -101,7 +101,7 @@ export default function Register() {
 
       {/* Alertas Toast */}
       {alert.show && (
-        <div className="fixed top-4 inset-x-0 flex justify-end px-6 z-50 animate-[slideDownFade_0.4s_ease-out]">
+        <div className="fixed top-4 inset-x-0 flex justify-end px-4 md:px-6 z-50 animate-[slideDownFade_0.4s_ease-out]">
           <div className={`bg-white dark:bg-slate-800 text-slate-900 dark:text-white border ${alert.type === 'error' ? 'border-red-500' : 'border-green-500'} rounded-xl shadow-lg px-5 py-4 w-80 flex items-start space-x-3 pointer-events-auto`}>
             {alert.type === 'error' ? <XCircle className="text-red-500 shrink-0" /> : <CheckCircle className="text-green-500 shrink-0" />}
             <div className="flex-1">
@@ -114,27 +114,27 @@ export default function Register() {
       )}
 
       {/* Botón Volver */}
-      <Link to="/" className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-full text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm group">
+      <Link to="/" className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2 px-3 py-2 md:px-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-full text-xs md:text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm group">
         <ArrowLeft className="h-4 w-4 transform group-hover:-translate-x-1 transition-transform" /> Volver al inicio
       </Link>
 
       {/* Header Logo */}
-      <div className="mt-8 flex items-center justify-center mb-2">
-        <svg className="h-12 w-12 mr-3 text-[#0082A0] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <div className="mt-2 flex items-center justify-center mb-2">
+        <svg className="h-10 w-10 md:h-12 md:w-12 mr-3 text-[#0082A0] dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 16.0001C4.23858 16.0001 2 13.7615 2 11.0001C2 8.23869 4.23858 6.00012 7 6.00012C7.33283 6.00012 7.65854 6.03266 7.97583 6.09495C8.92901 3.75217 11.2663 2.00012 14 2.00012C17.4565 2.00012 20.3344 4.44578 21.0828 7.71787C21.3825 7.8985 21.7006 8.12435 22 8.40012C20.9533 8.77542 20.2386 9.76969 20.0424 10.941C20.0143 11.1087 20 11.2805 20 11.4547C20 12.4812 20.5049 13.3956 21.2773 13.963C21.0458 15.1386 20.0058 16.0001 18.7778 16.0001H7Z" />
           <path d="M14 11.4547V8.72739M14 11.4547V14.1819M14 11.4547H16.7273M14 11.4547H11.2727" />
         </svg>
-        <h1 className="text-4xl font-black tracking-widest text-[#0082A0] dark:text-cyan-300">
+        <h1 className="text-3xl md:text-4xl font-black tracking-widest text-[#0082A0] dark:text-cyan-300">
           SOMA
         </h1>
       </div>
-      <h2 className="text-2xl md:text-3xl font-bold text-center text-slate-800 dark:text-slate-200 mt-2 px-4 max-w-2xl">
+      <h2 className="text-xl md:text-3xl font-bold text-center text-slate-800 dark:text-slate-200 mt-2 px-2 max-w-2xl">
         Crea una cuenta como médico o profesional de la salud en SOMA
       </h2>
 
-      {/* Contenedor del Formulario */}
-      <div className="mt-10 bg-white dark:bg-slate-800 shadow-xl w-full max-w-3xl p-8 md:p-10 rounded-2xl border border-slate-200 dark:border-slate-700">
-        <form onSubmit={handleRegister} className="space-y-6">
+      {/* Contenedor del Formulario (Ajustado p-6 para móvil y p-10 para PC) */}
+      <div className="mt-8 bg-white dark:bg-slate-800 shadow-xl w-full max-w-3xl p-6 md:p-10 rounded-2xl border border-slate-200 dark:border-slate-700">
+        <form onSubmit={handleRegister} className="space-y-5 md:space-y-6">
           
           {/* Especialidad */}
           <div>
@@ -146,7 +146,7 @@ export default function Register() {
           </div>
 
           {/* Nombres y Apellidos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
             <div>
               <label className="font-semibold text-sm text-slate-700 dark:text-slate-300">Primer Nombre</label>
               <input name="primer_nombre" type="text" maxLength="18" onChange={handleChange} placeholder="Ej: José" required className="w-full p-3 mt-1.5 border rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none transition-all" />
@@ -158,7 +158,7 @@ export default function Register() {
           </div>
 
           {/* Cédula y Teléfono */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
             <div>
               <label className="font-semibold text-sm text-slate-700 dark:text-slate-300">Número de identificación</label>
               <input name="numero_identificacion" type="text" maxLength="12" onChange={handleChange} placeholder="V-00000000" required className="w-full p-3 mt-1.5 border rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none transition-all" />
@@ -180,7 +180,7 @@ export default function Register() {
           </div>
 
           {/* Contraseñas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
             <div>
               <label className="font-semibold text-sm text-slate-700 dark:text-slate-300">Contraseña</label>
               <input name="contrasena" type="password" onChange={handleChange} required className="w-full p-3 mt-1.5 border rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-cyan-500 outline-none transition-all" />
@@ -203,7 +203,7 @@ export default function Register() {
           </div>
 
           {/* País y Ciudad */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
             <div>
               <label className="font-semibold text-sm text-slate-700 dark:text-slate-300">País</label>
               <select name="pais" disabled className="w-full p-3 mt-1.5 border rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed outline-none">
@@ -222,7 +222,7 @@ export default function Register() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full mt-4 bg-[#0082A0] dark:bg-cyan-600 text-white py-3.5 rounded-xl text-lg font-bold hover:bg-[#006d87] dark:hover:bg-cyan-700 transition-all transform hover:-translate-y-0.5 shadow-lg shadow-cyan-500/30 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
+            className="w-full mt-4 bg-[#0082A0] dark:bg-cyan-600 text-white py-3 md:py-3.5 rounded-xl text-lg font-bold hover:bg-[#006d87] dark:hover:bg-cyan-700 transition-all transform hover:-translate-y-0.5 shadow-lg shadow-cyan-500/30 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
           >
             {loading ? "Registrando Doctor..." : "Registrarse"}
           </button>
