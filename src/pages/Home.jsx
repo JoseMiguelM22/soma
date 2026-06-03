@@ -144,7 +144,7 @@ export default function Home() {
               </button>
               {isMobileCreateOpen && (
                 <div className="ml-4 mt-2 flex flex-col space-y-2 text-base">
-                  <Link to="/registrar" className="hover:text-cyan-600 dark:hover:text-cyan-400">Registrarse como médico</Link>
+                  <Link to="/register" className="hover:text-cyan-600 dark:hover:text-cyan-400">Registrarse como médico</Link>
                 </div>
               )}
             </div>
@@ -185,7 +185,7 @@ export default function Home() {
             ¿Eres un Profesional de la Salud?
           </h2>
 
-          <Link to="/registrar" className="inline-block bg-blue-700 dark:bg-blue-600 text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-blue-800 dark:hover:bg-blue-700 transition-colors">
+          <Link to="/register" className="inline-block bg-blue-700 dark:bg-blue-600 text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-blue-800 dark:hover:bg-blue-700 transition-colors">
             Regístrate aquí
           </Link>
 
