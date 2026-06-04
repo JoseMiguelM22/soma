@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Register from './pages/Register';
 import Pacientes from './pages/Pacientes';
 import ActualizarContrasena from './pages/ActualizarContrasena';
+import Historias from './pages/Historias';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/pacientes" element={<Pacientes />} />
       <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
+      <Route path="/historias" element={<Historias />} />
     </Routes>
   )
 }
