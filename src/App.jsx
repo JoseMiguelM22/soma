@@ -3,6 +3,8 @@ import Home from './pages/Home'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Register from './pages/Register';
+import Pacientes from './pages/Pacientes';
+import ActualizarContrasena from './pages/ActualizarContrasena';
 
 function App() {
   return (
@@ -11,6 +13,8 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/pacientes" element={<Pacientes />} />
+      <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
     </Routes>
   )
 }

@@ -7,6 +7,9 @@ export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   
+  // ESTADO NUEVO: Controla si estamos en modo "Login" o "Recuperar Contraseña"
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  
   // Estados para los loaders
   const [showMainLoader, setShowMainLoader] = useState(true);
   const [loaderWidth, setLoaderWidth] = useState(0);
@@ -40,29 +43,45 @@ export default function Login() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleLogin = async (e) => {
+  // Función unificada para Login o Recuperar Contraseña
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    try {
-      // Iniciar sesión con Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.correo,
-        password: formData.contrasena,
-      });
+    if (isResettingPassword) {
+      // === LÓGICA DE RECUPERAR CONTRASEÑA ===
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(formData.correo, {
+          redirectTo: window.location.origin + '/actualizar-contrasena', // Aquí los mandará el correo luego (lo crearemos después)
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setAlert({ show: true, type: 'success', message: '¡Bienvenido de vuelta, Doctor!' });
-      
-      // Redirigir al panel médico después de un segundo
-      setTimeout(() => navigate('/dashboard'), 1000);
+        setAlert({ show: true, type: 'success', message: '¡Listo! Te hemos enviado un enlace al correo para recuperar tu contraseña.' });
+        setIsResettingPassword(false); // Volvemos a la vista normal de login
+      } catch (error) {
+        setAlert({ show: true, type: 'error', message: 'Error al enviar el correo. Verifica que esté bien escrito o registrado.' });
+      } finally {
+        setLoading(false);
+      }
 
-    } catch (error) {
-      // Si el correo o clave son incorrectos
-      setAlert({ show: true, type: 'error', message: 'Credenciales incorrectas. Verifica tu correo y contraseña.' });
-    } finally {
-      setLoading(false);
+    } else {
+      // === LÓGICA DE INICIO DE SESIÓN NORMAL ===
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.correo,
+          password: formData.contrasena,
+        });
+
+        if (error) throw error;
+
+        setAlert({ show: true, type: 'success', message: '¡Bienvenido de vuelta, Doctor!' });
+        setTimeout(() => navigate('/dashboard'), 1000);
+      } catch (error) {
+        setAlert({ show: true, type: 'error', message: 'Credenciales incorrectas. Verifica tu correo y contraseña.' });
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -129,14 +148,20 @@ export default function Login() {
           </div>
 
           <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white leading-tight">
-            Inicia sesión en tu cuenta<br />como médico o profesional
+            {isResettingPassword ? (
+              <>Recupera tu contraseña<br />de SOMA</>
+            ) : (
+              <>Inicia sesión en tu cuenta<br />como médico o profesional</>
+            )}
           </h2>
 
           <p className="text-slate-600 dark:text-slate-300 mt-3 text-[15px]">
-            ¿No tienes una cuenta?{' '}
-            <Link to="/register" className="text-cyan-700 dark:text-cyan-400 font-bold hover:underline transition-all">
-              Regístrate aquí →
-            </Link>
+            {isResettingPassword ? 'Ingresa tu correo para enviarte las instrucciones.' : '¿No tienes una cuenta? '}
+            {!isResettingPassword && (
+              <Link to="/register" className="text-cyan-700 dark:text-cyan-400 font-bold hover:underline transition-all">
+                Regístrate aquí →
+              </Link>
+            )}
           </p>
 
           <div className="flex items-center my-8 w-full max-w-sm">
@@ -145,12 +170,15 @@ export default function Login() {
             <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5 w-full max-w-sm">
+          <form onSubmit={handleSubmit} className="space-y-5 w-full max-w-sm">
+            
+            {/* Input de Correo (Se usa en ambos casos) */}
             <div className="text-left">
               <label className="block text-slate-700 dark:text-slate-300 font-medium text-sm">Correo Electrónico</label>
               <input 
                 type="email" 
                 name="correo" 
+                value={formData.correo}
                 onChange={handleChange}
                 required 
                 className="w-full mt-1.5 px-4 py-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none transition-all" 
@@ -158,24 +186,39 @@ export default function Login() {
               />
             </div>
 
-            <div className="text-left">
-              <label className="block text-slate-700 dark:text-slate-300 font-medium text-sm">Contraseña</label>
-              <input 
-                type="password" 
-                name="contrasena" 
-                onChange={handleChange}
-                required 
-                className="w-full mt-1.5 px-4 py-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none transition-all" 
-                placeholder="••••••••" 
-              />
-            </div>
+            {/* Input de Contraseña (Solo se muestra en Login) */}
+            {!isResettingPassword && (
+              <div className="text-left">
+                <label className="block text-slate-700 dark:text-slate-300 font-medium text-sm">Contraseña</label>
+                <input 
+                  type="password" 
+                  name="contrasena" 
+                  value={formData.contrasena}
+                  onChange={handleChange}
+                  required 
+                  className="w-full mt-1.5 px-4 py-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none transition-all" 
+                  placeholder="••••••••" 
+                />
+              </div>
+            )}
 
+            {/* Checkbox y Botones para cambiar modo */}
             <div className="flex justify-between items-center text-sm">
-              <label className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input type="checkbox" className="h-4 w-4 text-cyan-600 rounded border-slate-300 focus:ring-cyan-500" />
-                <span>Recuérdame</span>
-              </label>
-              <a href="#" className="text-cyan-700 dark:text-cyan-400 font-medium hover:underline transition-all">¿Olvidaste tu contraseña?</a>
+              {!isResettingPassword ? (
+                <>
+                  <label className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4 text-cyan-600 rounded border-slate-300 focus:ring-cyan-500" />
+                    <span>Recuérdame</span>
+                  </label>
+                  <button type="button" onClick={() => setIsResettingPassword(true)} className="text-cyan-700 dark:text-cyan-400 font-medium hover:underline transition-all">
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => setIsResettingPassword(false)} className="text-cyan-700 dark:text-cyan-400 font-medium hover:underline transition-all w-full text-center">
+                  Volver a iniciar sesión
+                </button>
+              )}
             </div>
 
             <button 
@@ -183,14 +226,16 @@ export default function Login() {
               disabled={loading}
               className="w-full mt-4 bg-cyan-700 dark:bg-cyan-600 text-white py-3.5 rounded-xl font-bold hover:bg-cyan-800 dark:hover:bg-cyan-700 transition-all transform hover:-translate-y-0.5 shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
             >
-              {loading ? 'Verificando...' : 'Iniciar Sesión'}
+              {loading 
+                ? (isResettingPassword ? 'Enviando...' : 'Verificando...') 
+                : (isResettingPassword ? 'Enviar enlace de recuperación' : 'Iniciar Sesión')
+              }
             </button>
           </form>
         </div>
 
         {/* Columna Derecha: Imagen en Escritorio */}
         <div className="hidden md:block h-full">
-          {/* Asegúrate de tener una imagen llamada login.jpg en tu carpeta public */}
           <img src="/login.jpg" className="w-full h-full object-cover" alt="Doctora SOMA" />
         </div>
         
