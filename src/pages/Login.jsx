@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Eye, EyeOff, Activity } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   
-  // ESTADO NUEVO: Controla si estamos en modo "Login" o "Recuperar Contraseña"
+  // Controla si estamos en modo "Login" o "Recuperar Contraseña"
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  
+  // Controla ver/ocultar contraseña
+  const [showPassword, setShowPassword] = useState(false);
   
   // Estados para los loaders
   const [showMainLoader, setShowMainLoader] = useState(true);
@@ -20,18 +23,22 @@ export default function Login() {
 
   // Efecto inicial para simular la carga de la página
   useEffect(() => {
-    // 1. Animamos la barra superior
     setTimeout(() => setLoaderWidth(100), 50);
-
-    // 2. Desvanecemos el cargador central
     const timer = setTimeout(() => {
       setShowMainLoader(false);
     }, 800);
-
     return () => clearTimeout(timer);
   }, []);
 
-  // Efecto para ocultar alertas después de 5 segundos
+  // Efecto para aplicar tema oscuro si viene del Home
+  useEffect(() => {
+    const isDark = localStorage.getItem('theme') === 'dark' || 
+                  (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, []);
+
+  // Efecto para ocultar alertas
   useEffect(() => {
     if (alert.show) {
       const timer = setTimeout(() => setAlert({ show: false, type: '', message: '' }), 5000);
@@ -43,38 +50,31 @@ export default function Login() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Función unificada para Login o Recuperar Contraseña
+  // Función unificada
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     if (isResettingPassword) {
-      // === LÓGICA DE RECUPERAR CONTRASEÑA ===
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.correo, {
-          redirectTo: window.location.origin + '/actualizar-contrasena', // Aquí los mandará el correo luego (lo crearemos después)
+          redirectTo: window.location.origin + '/actualizar-contrasena',
         });
-
         if (error) throw error;
-
-        setAlert({ show: true, type: 'success', message: '¡Listo! Te hemos enviado un enlace al correo para recuperar tu contraseña.' });
-        setIsResettingPassword(false); // Volvemos a la vista normal de login
+        setAlert({ show: true, type: 'success', message: 'Te enviamos un enlace al correo para recuperar tu contraseña.' });
+        setIsResettingPassword(false);
       } catch (error) {
-        setAlert({ show: true, type: 'error', message: 'Error al enviar el correo. Verifica que esté bien escrito o registrado.' });
+        setAlert({ show: true, type: 'error', message: 'Error al enviar el correo. Verifica que esté registrado.' });
       } finally {
         setLoading(false);
       }
-
     } else {
-      // === LÓGICA DE INICIO DE SESIÓN NORMAL ===
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.correo,
           password: formData.contrasena,
         });
-
         if (error) throw error;
-
         setAlert({ show: true, type: 'success', message: '¡Bienvenido de vuelta, Doctor!' });
         setTimeout(() => navigate('/dashboard'), 1000);
       } catch (error) {
@@ -86,165 +86,162 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 transition-colors duration-300 overflow-auto md:overflow-hidden min-h-screen relative font-sans">
+    // Fondo igual al del Home para consistencia
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-700 via-cyan-600 to-teal-500 dark:from-slate-900 dark:via-[#0a192f] dark:to-[#082f3a] transition-colors duration-500 font-sans relative">
       
-      {/* Botón Volver */}
-      <Link to="/" className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-full text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition shadow-sm group">
-        <ArrowLeft className="h-4 w-4 transform group-hover:-translate-x-1 transition-transform" /> Volver al inicio
-      </Link>
-
       {/* Cargador Central (Main Loader) */}
-      <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white dark:bg-slate-900 transition-opacity duration-500 ${showMainLoader ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white dark:bg-[#0f172a] transition-opacity duration-500 ${showMainLoader ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="relative flex items-center justify-center">
-          <div className="w-20 h-20 border-4 border-cyan-100 dark:border-slate-800 border-t-cyan-600 rounded-full animate-spin"></div>
-          <div className="absolute w-12 h-12 bg-cyan-600 rounded-2xl shadow-xl shadow-cyan-500/20 flex items-center justify-center animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+          <div className="w-20 h-20 border-4 border-cyan-100 dark:border-slate-800 border-t-cyan-500 rounded-full animate-spin"></div>
+          <div className="absolute w-12 h-12 bg-cyan-600 rounded-2xl flex items-center justify-center animate-pulse">
+            <Activity className="h-6 w-6 text-white" />
           </div>
         </div>
       </div>
 
       {/* Barra de carga superior */}
-      <div 
-        className="fixed top-0 left-0 h-[3px] bg-cyan-500 z-[10000] transition-all duration-700 ease-out"
-        style={{ width: `${loaderWidth}%`, opacity: showMainLoader ? 1 : 0 }}
-      ></div>
+      <div className="fixed top-0 left-0 h-[3px] bg-white z-[10000] transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ width: `${loaderWidth}%`, opacity: showMainLoader ? 1 : 0 }}></div>
 
       {/* Alertas Toast */}
       {alert.show && (
-        <div className="fixed top-4 inset-x-0 flex justify-end px-6 z-50 animate-[slideDownFade_0.4s_ease-out] pointer-events-none">
-          <div className={`pointer-events-auto bg-white dark:bg-slate-800 text-slate-900 dark:text-white border ${alert.type === 'error' ? 'border-red-500' : 'border-green-500'} rounded-xl shadow-lg px-5 py-4 w-80 flex items-start space-x-3`}>
+        <div className="fixed top-4 inset-x-0 flex justify-center px-6 z-50 animate-[slideDownFade_0.4s_ease-out]">
+          <div className={`bg-white dark:bg-slate-800 text-slate-900 dark:text-white border ${alert.type === 'error' ? 'border-red-500' : 'border-green-500'} rounded-xl shadow-2xl px-5 py-4 w-80 max-w-full flex items-start space-x-3`}>
             {alert.type === 'error' ? <XCircle className="text-red-500 shrink-0 text-xl" /> : <CheckCircle className="text-green-500 shrink-0 text-xl" />}
             <div className="flex-1">
-              <h3 className="font-semibold text-sm">{alert.type === 'error' ? 'Hubo un error' : 'Éxito'}</h3>
-              <p className="text-sm mt-1 text-slate-600 dark:text-slate-300">{alert.message}</p>
+              <h3 className="font-bold text-sm">{alert.type === 'error' ? 'Hubo un error' : 'Éxito'}</h3>
+              <p className="text-xs mt-1 text-slate-600 dark:text-slate-300">{alert.message}</p>
             </div>
-            <button onClick={() => setAlert({ show: false })} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">✕</button>
+            <button onClick={() => setAlert({ show: false })} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
           </div>
         </div>
       )}
 
-      {/* Contenedor Principal Dividido */}
-      <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen">
+      {/* TARJETA CENTRAL TIPO GALÉNICOS */}
+      <div className="w-full max-w-[420px] bg-white dark:bg-[#111111] rounded-[2rem] shadow-2xl p-8 sm:p-10 relative z-10 animate-[fadeIn_0.5s_ease-out]">
         
-        {/* Imagen en Móvil (Aparece arriba) */}
-        <div className="md:hidden w-full h-64">
-          <img src="/login.jpg" className="w-full h-full object-cover" alt="Doctora SOMA" />
+        {/* Cabecera / Logo */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-block text-3xl font-bold transition-colors text-cyan-600 dark:text-cyan-400">
+            <span className="font-normal">SOMA</span>
+            <span className="font-black">Cloud</span>
+          </Link>
+          <div className="flex items-center justify-center gap-2 mt-3 text-[10px] font-bold text-slate-400 tracking-[0.2em]">
+            <div className="h-px w-6 bg-slate-200 dark:bg-slate-700"></div>
+            MÉDICOS Y ESPECIALISTAS
+            <div className="h-px w-6 bg-slate-200 dark:bg-slate-700"></div>
+          </div>
         </div>
 
-        {/* Columna Izquierda: Formulario */}
-        <div className="flex flex-col justify-center items-center px-10 md:px-20 py-10 md:py-0 text-center w-full">
-          
-          {/* Logo SOMA */}
-          <div className="flex items-center justify-center mb-8">
-            <svg className="h-12 w-12 mr-3 text-cyan-700 dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 16.0001C4.23858 16.0001 2 13.7615 2 11.0001C2 8.23869 4.23858 6.00012 7 6.00012C7.33283 6.00012 7.65854 6.03266 7.97583 6.09495C8.92901 3.75217 11.2663 2.00012 14 2.00012C17.4565 2.00012 20.3344 4.44578 21.0828 7.71787C21.3825 7.8985 21.7006 8.12435 22 8.40012C20.9533 8.77542 20.2386 9.76969 20.0424 10.941C20.0143 11.1087 20 11.2805 20 11.4547C20 12.4812 20.5049 13.3956 21.2773 13.963C21.0458 15.1386 20.0058 16.0001 18.7778 16.0001H7Z" />
-              <path d="M14 11.4547V8.72739M14 11.4547V14.1819M14 11.4547H16.7273M14 11.4547H11.2727" />
-            </svg>
-            <h1 className="text-4xl font-black tracking-widest text-cyan-700 dark:text-cyan-400">
-              SOMA
-            </h1>
-          </div>
-
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white leading-tight">
-            {isResettingPassword ? (
-              <>Recupera tu contraseña<br />de SOMA</>
-            ) : (
-              <>Inicia sesión en tu cuenta<br />como médico o profesional</>
-            )}
-          </h2>
-
-          <p className="text-slate-600 dark:text-slate-300 mt-3 text-[15px]">
-            {isResettingPassword ? 'Ingresa tu correo para enviarte las instrucciones.' : '¿No tienes una cuenta? '}
-            {!isResettingPassword && (
-              <Link to="/register" className="text-cyan-700 dark:text-cyan-400 font-bold hover:underline transition-all">
-                Regístrate aquí →
-              </Link>
-            )}
+        {/* Textos Principales */}
+        <div className="text-center mb-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+            ¿Sin cuenta? <Link to="/register" className="text-cyan-600 dark:text-cyan-400 font-bold hover:underline">Regístrate gratis</Link>
           </p>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">
+            {isResettingPassword ? 'Recupera tu acceso' : 'Entra a tu consultorio'}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {isResettingPassword ? 'Ingresa tu correo para recibir las instrucciones.' : 'Correo y contraseña de tu cuenta médica.'}
+          </p>
+        </div>
 
-          <div className="flex items-center my-8 w-full max-w-sm">
-            <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
-            <span className="mx-4 text-slate-500 dark:text-slate-400 text-sm font-medium tracking-wider">SOMA CLOUD</span>
-            <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
+        {/* Formulario */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* Input Correo (Estilo Integrado) */}
+          <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Correo Electrónico</label>
+            <input 
+              type="email" 
+              name="correo" 
+              value={formData.correo}
+              onChange={handleChange}
+              required 
+              className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600"
+              placeholder="nombre@ejemplo.com" 
+            />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5 w-full max-w-sm">
-            
-            {/* Input de Correo (Se usa en ambos casos) */}
-            <div className="text-left">
-              <label className="block text-slate-700 dark:text-slate-300 font-medium text-sm">Correo Electrónico</label>
+          {/* Input Contraseña */}
+          {!isResettingPassword && (
+            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all relative">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Contraseña</label>
               <input 
-                type="email" 
-                name="correo" 
-                value={formData.correo}
+                type={showPassword ? "text" : "password"} 
+                name="contrasena" 
+                value={formData.contrasena}
                 onChange={handleChange}
                 required 
-                className="w-full mt-1.5 px-4 py-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none transition-all" 
-                placeholder="correo@ejemplo.com" 
+                className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600 pr-10"
+                placeholder="••••••••" 
               />
+              <button 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-500 transition-colors mt-2"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
+          )}
 
-            {/* Input de Contraseña (Solo se muestra en Login) */}
-            {!isResettingPassword && (
-              <div className="text-left">
-                <label className="block text-slate-700 dark:text-slate-300 font-medium text-sm">Contraseña</label>
-                <input 
-                  type="password" 
-                  name="contrasena" 
-                  value={formData.contrasena}
-                  onChange={handleChange}
-                  required 
-                  className="w-full mt-1.5 px-4 py-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-cyan-600 outline-none transition-all" 
-                  placeholder="••••••••" 
-                />
-              </div>
-            )}
-
-            {/* Checkbox y Botones para cambiar modo */}
-            <div className="flex justify-between items-center text-sm">
-              {!isResettingPassword ? (
-                <>
-                  <label className="flex items-center space-x-2 text-slate-700 dark:text-slate-300 cursor-pointer">
-                    <input type="checkbox" className="h-4 w-4 text-cyan-600 rounded border-slate-300 focus:ring-cyan-500" />
-                    <span>Recuérdame</span>
-                  </label>
-                  <button type="button" onClick={() => setIsResettingPassword(true)} className="text-cyan-700 dark:text-cyan-400 font-medium hover:underline transition-all">
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </>
-              ) : (
-                <button type="button" onClick={() => setIsResettingPassword(false)} className="text-cyan-700 dark:text-cyan-400 font-medium hover:underline transition-all w-full text-center">
-                  Volver a iniciar sesión
+          {/* Opciones extra */}
+          <div className="flex justify-between items-center text-xs mt-2 mb-6">
+            {!isResettingPassword ? (
+              <>
+                <label className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 cursor-pointer group">
+                  <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer" />
+                  <span className="group-hover:text-slate-900 dark:group-hover:text-white transition-colors">Recordarme</span>
+                </label>
+                <button type="button" onClick={() => setIsResettingPassword(true)} className="text-cyan-600 dark:text-cyan-400 font-bold hover:underline transition-all">
+                  ¿Olvidaste la contraseña?
                 </button>
-              )}
-            </div>
+              </>
+            ) : (
+              <button type="button" onClick={() => setIsResettingPassword(false)} className="text-cyan-600 dark:text-cyan-400 font-bold hover:underline transition-all w-full text-center">
+                Volver a iniciar sesión
+              </button>
+            )}
+          </div>
 
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full mt-4 bg-cyan-700 dark:bg-cyan-600 text-white py-3.5 rounded-xl font-bold hover:bg-cyan-800 dark:hover:bg-cyan-700 transition-all transform hover:-translate-y-0.5 shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:transform-none disabled:cursor-not-allowed"
-            >
-              {loading 
-                ? (isResettingPassword ? 'Enviando...' : 'Verificando...') 
-                : (isResettingPassword ? 'Enviar enlace de recuperación' : 'Iniciar Sesión')
-              }
-            </button>
-          </form>
+          {/* Botón Principal */}
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-[#0081a7] hover:bg-[#006a8a] dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white py-3.5 rounded-xl font-bold text-sm transition-all transform hover:-translate-y-0.5 shadow-lg shadow-cyan-900/20 disabled:opacity-50 disabled:transform-none flex justify-center items-center gap-2"
+          >
+            {loading 
+              ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Procesando...</>
+              : (isResettingPassword ? 'Enviar enlace de recuperación' : 'Continuar')
+            }
+          </button>
+        </form>
+
+        {/* Footer de la tarjeta */}
+        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5 flex flex-col items-center space-y-4">
+          <button className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
+            Acceso asistentes
+          </button>
+          <Link to="/" className="text-xs font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1.5 hover:text-slate-800 dark:hover:text-white transition-colors group">
+            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Inicio
+          </Link>
         </div>
 
-        {/* Columna Derecha: Imagen en Escritorio */}
-        <div className="hidden md:block h-full">
-          <img src="/login.jpg" className="w-full h-full object-cover" alt="Doctora SOMA" />
-        </div>
-        
       </div>
+
+      {/* Copyright flotante */}
+      <p className="mt-8 text-[10px] text-white/50 relative z-10 uppercase tracking-widest font-medium">
+        © {new Date().getFullYear()} SOMA Cloud
+      </p>
 
       <style>{`
         @keyframes slideDownFade {
           0% { opacity: 0; transform: translateY(-20px); }
           100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          0% { opacity: 0; transform: scale(0.95); }
+          100% { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>

@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Pacientes from './pages/Pacientes';
 import ActualizarContrasena from './pages/ActualizarContrasena';
 import Historias from './pages/Historias';
+import Agendas from './pages/Agendas';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
       <Route path="/pacientes" element={<Pacientes />} />
       <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
       <Route path="/historias" element={<Historias />} />
+      <Route path="/agenda" element={<Agendas />} />
     </Routes>
   )
 }

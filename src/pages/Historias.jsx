@@ -4,9 +4,9 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, Settings, LogOut, 
   Menu, Sun, Moon, Plus, Search, X, PanelLeft, ClipboardList, 
-  Activity, FileBadge, Pill, MessageCircle, Stethoscope, FolderOpen, Trash2
+  Activity, Check, Maximize, FileSignature, AlignLeft, Bold, Italic, 
+  Underline, Strikethrough, List, ListOrdered, Type, Eye, Filter, ArrowLeft, Edit3
 } from 'lucide-react';
-import { jsPDF } from "jspdf";
 
 export default function Historias() {
   const navigate = useNavigate();
@@ -16,39 +16,43 @@ export default function Historias() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // ================= MODALES =================
-  const [isModalConsultaOpen, setIsModalConsultaOpen] = useState(false);
+  // ================= MODALES Y VISTAS =================
+  const [isModalConsultaOpen, setIsModalConsultaOpen] = useState(false); 
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null); 
-  const [tipoDocumento, setTipoDocumento] = useState(null); 
-  const [textoDocumento, setTextoDocumento] = useState(''); 
   
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [consultas, setConsultas] = useState([]); // Todas las consultas crudas
-  const [historiasAgrupadas, setHistoriasAgrupadas] = useState([]); // Para la tabla (1 por paciente)
-  const [historialPaciente, setHistorialPaciente] = useState([]); // Consultas de un paciente específico
+  const [historiasAgrupadas, setHistoriasAgrupadas] = useState([]); // Consultas agrupadas por paciente
   const [pacientesLista, setPacientesLista] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   
   const [guardando, setGuardando] = useState(false);
-  const [formData, setFormData] = useState({
-    id_paciente: '', motivo: '', sintomas: '', diagnostico: '', tratamiento: ''
+  
+  // Estado para NUEVA o EDITAR Historia
+  const [historiaData, setHistoriaData] = useState({
+    id: null,
+    id_paciente: '', 
+    fecha_consulta: new Date().toISOString().slice(0, 16),
+    proxima_consulta: '',
+    consultorio: '',
+    nota_clinica: 'Diagnóstico:\n\n'
   });
+
+  const listaConsultorios = [
+    "Medics", "", "Centro clinico"];
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  // Cargar datos principales
+  // ================= CARGA DE DATOS =================
   const fetchData = async () => {
     setLoading(true);
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (!session || sessionError) {
-      navigate('/login');
-      return;
-    }
+    if (!session || sessionError) return navigate('/login');
 
     const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
     if (dbUser) setUserData(dbUser);
@@ -60,24 +64,25 @@ export default function Historias() {
       .from('consultas')
       .select('*, pacientes(*)')
       .eq('id_medico', session.user.id)
-      .order('created_at', { ascending: false }); // Vienen de la más nueva a la más vieja
+      .order('created_at', { ascending: false });
 
     if (dbConsultas && !consError) {
-      setConsultas(dbConsultas);
-      
-      // AGRUPAMOS PARA EVITAR DUPLICADOS EN LA TABLA PRINCIPAL
+      const validas = dbConsultas.filter(c => c.pacientes != null);
+      setConsultas(validas);
+
+      // AGRUPAR POR PACIENTE PARA EVITAR DUPLICADOS EN LA VISTA PRINCIPAL
       const mapaAgrupado = new Map();
-      dbConsultas.forEach(c => {
-        if (!mapaAgrupado.has(c.id_paciente)) {
-          // Como están ordenadas por fecha, la primera que vemos es la ÚLTIMA visita
-          mapaAgrupado.set(c.id_paciente, {
-            paciente: c.pacientes,
+      validas.forEach(c => {
+        // Soporte por si Supabase devuelve arreglo u objeto
+        const pac = Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes;
+        if (!mapaAgrupado.has(pac.id)) {
+          mapaAgrupado.set(pac.id, {
+            paciente: pac,
             ultima_consulta: c,
             total_visitas: 1
           });
         } else {
-          // Si ya existe, solo sumamos 1 al contador de visitas
-          mapaAgrupado.get(c.id_paciente).total_visitas += 1;
+          mapaAgrupado.get(pac.id).total_visitas += 1;
         }
       });
       setHistoriasAgrupadas(Array.from(mapaAgrupado.values()));
@@ -85,9 +90,7 @@ export default function Historias() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [navigate]);
+  useEffect(() => { fetchData(); }, [navigate]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -99,139 +102,121 @@ export default function Historias() {
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const formatearFechaTexto = (fechaCompleta) => {
+    if (!fechaCompleta) return '';
+    const fecha = new Date(fechaCompleta);
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const horas = String(fecha.getHours()).padStart(2, '0');
+    const minutos = String(fecha.getMinutes()).padStart(2, '0');
+    return `${dia} de ${meses[fecha.getMonth()]} de ${fecha.getFullYear()} a las ${horas}:${minutos}`;
   };
 
-  // ================= FUNCIONES DEL EXPEDIENTE =================
-  
-  const abrirExpediente = (paciente) => {
-    setPacienteSeleccionado(paciente);
-    // Filtramos localmente para que sea súper rápido sin recargar
-    const historial = consultas.filter(c => c.id_paciente === paciente.id);
-    setHistorialPaciente(historial);
-  };
-
-  const handleWhatsApp = (telefono) => {
-    if (!telefono) {
-      alert("Este paciente no tiene un número de teléfono registrado.");
-      return;
-    }
-    let numeroLimpio = telefono.replace(/\D/g, '');
-    if (numeroLimpio.startsWith('0')) numeroLimpio = '58' + numeroLimpio.substring(1);
-    else if (!numeroLimpio.startsWith('58') && numeroLimpio.length === 10) numeroLimpio = '58' + numeroLimpio;
+  // ================= LÓGICA DEL EDITOR DE TEXTO (WYSIWYG FAKE) =================
+  const insertTextAtCursor = (textToInsert) => {
+    const textarea = document.getElementById('editorClinico');
+    if (!textarea) return;
     
-    window.open(`https://wa.me/${numeroLimpio}`, '_blank');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = historiaData.nota_clinica;
+    
+    const newText = text.substring(0, start) + textToInsert + text.substring(end);
+    setHistoriaData({ ...historiaData, nota_clinica: newText });
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+    }, 0);
   };
 
-  const handleGuardarConsulta = async (e) => {
+  // ================= FUNCIONES DE NAVEGACIÓN Y GUARDADO =================
+  
+  // Abre la lista de historias de un paciente específico
+  const verHistorialPaciente = (paciente) => {
+    setPacienteSeleccionado(paciente);
+    setIsModalConsultaOpen(false);
+  };
+
+  // Abre el editor para crear/editar una consulta específica
+  const abrirEditorHistoria = (consulta = null, idPacienteForzado = null) => {
+    if (consulta) {
+      // MODO EDICIÓN
+      setHistoriaData({
+        id: consulta.id,
+        id_paciente: consulta.id_paciente,
+        fecha_consulta: consulta.fecha_consulta || consulta.created_at.slice(0, 16),
+        proxima_consulta: consulta.proxima_consulta || '',
+        consultorio: consulta.consultorio || '',
+        nota_clinica: consulta.nota_clinica || consulta.sintomas || '' 
+      });
+    } else {
+      // MODO NUEVO
+      setHistoriaData({
+        id: null,
+        id_paciente: idPacienteForzado || (pacienteSeleccionado ? pacienteSeleccionado.id : ''),
+        fecha_consulta: new Date().toISOString().slice(0, 16),
+        proxima_consulta: '',
+        consultorio: '',
+        nota_clinica: 'Diagnóstico:\n\n'
+      });
+    }
+    setIsModalConsultaOpen(true);
+  };
+
+  const handleGuardarHistoria = async (e) => {
     e.preventDefault();
     setGuardando(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const idFinalPaciente = pacienteSeleccionado ? pacienteSeleccionado.id : formData.id_paciente;
-
-      const { data, error } = await supabase.from('consultas').insert([{
+      
+      const payload = {
         id_medico: session.user.id,
-        id_paciente: idFinalPaciente,
-        motivo: formData.motivo,
-        sintomas: formData.sintomas,
-        diagnostico: formData.diagnostico,
-        tratamiento: formData.tratamiento
-      }]).select('*, pacientes(*)'); // Pedimos que devuelva con datos del paciente para la UI
+        id_paciente: historiaData.id_paciente,
+        fecha_consulta: historiaData.fecha_consulta,
+        proxima_consulta: historiaData.proxima_consulta || null,
+        consultorio: historiaData.consultorio,
+        nota_clinica: historiaData.nota_clinica,
+        estado: 'Completada',
+        motivo: 'Evolutiva' 
+      };
 
-      if (error) throw error;
-
-      await fetchData(); // Recarga la tabla agrupada del fondo
-      
-      if (pacienteSeleccionado) {
-        setHistorialPaciente([data[0], ...historialPaciente]); // Lo añade de primero en el modal
+      let error;
+      if (historiaData.id) {
+        const res = await supabase.from('consultas').update(payload).eq('id', historiaData.id);
+        error = res.error;
+      } else {
+        const res = await supabase.from('consultas').insert([payload]);
+        error = res.error;
       }
-      
-      setIsModalConsultaOpen(false);
-      setFormData({ id_paciente: '', motivo: '', sintomas: '', diagnostico: '', tratamiento: '' });
 
+      if (error) {
+        if (error.message.includes('column')) {
+          alert("Asegúrate de agregar las nuevas columnas a la tabla 'consultas' en Supabase.");
+        } else throw error;
+      } else {
+        await fetchData(); // Refrescar los datos para que aparezcan enseguida
+        setIsModalConsultaOpen(false);
+      }
     } catch (error) {
-      alert("Hubo un error al guardar. Intenta de nuevo.");
+      alert("Error al guardar: " + error.message);
     } finally {
       setGuardando(false);
     }
   };
 
-  // FUNCIÓN PARA ELIMINAR CONSULTA INDIVIDUAL
-  const eliminarConsulta = async (idConsulta) => {
-    const confirmar = window.confirm("¿Estás seguro de eliminar esta consulta? Esta acción no se puede deshacer.");
-    if (!confirmar) return;
-
-    try {
-      const { error } = await supabase.from('consultas').delete().eq('id', idConsulta);
-      if (error) throw error;
-
-      // Actualizamos la UI quitándola de la lista
-      setHistorialPaciente(historialPaciente.filter(c => c.id !== idConsulta));
-      await fetchData(); // Refresca la tabla principal del fondo
-
-    } catch (error) {
-      alert("Error al eliminar la consulta.");
-    }
-  };
-
-  // ================= MAGIA DEL PDF =================
-  const generarPDF = (e) => {
-    e.preventDefault();
-    const doc = new jsPDF();
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.setTextColor(0, 130, 160);
-    doc.text("SOMA Cloud", 105, 20, { align: "center" });
-
-    doc.setFontSize(14);
-    doc.setTextColor(50, 50, 50);
-    const titulo = tipoDocumento === 'recipe' ? 'RÉCIPE MÉDICO' : 'CONSTANCIA MÉDICA';
-    doc.text(titulo, 105, 30, { align: "center" });
-
-    doc.setLineWidth(0.5);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 35, 190, 35);
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Médico Tratante: Dr(a). ${userData?.nombres} ${userData?.apellidos}`, 20, 45);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 150, 45);
-
-    doc.setFont("helvetica", "bold");
-    doc.text("Datos del Paciente", 20, 60);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nombre: ${pacienteSeleccionado?.nombres} ${pacienteSeleccionado?.apellidos}`, 20, 68);
-    doc.text(`Cédula: ${pacienteSeleccionado?.cedula || 'N/A'}`, 150, 68);
-
-    doc.line(20, 75, 190, 75);
-
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(50, 50, 50);
-    const lineas = doc.splitTextToSize(textoDocumento, 170); 
-    doc.text(lineas, 20, 85);
-
-    doc.setFontSize(9);
-    doc.setTextColor(150, 150, 150);
-    doc.text("Documento generado de forma automatizada por SOMA Cloud", 105, 280, { align: "center" });
-
-    const prefijo = tipoDocumento === 'recipe' ? 'Recipe' : 'Constancia';
-    doc.save(`${prefijo}_${pacienteSeleccionado?.nombres}_${new Date().getTime()}.pdf`);
-    
-    setTipoDocumento(null);
-    setTextoDocumento('');
-  };
-
-  // Buscador filtrando sobre la tabla agrupada
-  const historiasFiltradas = historiasAgrupadas.filter(item => {
-    const nombrePaciente = `${item.paciente?.nombres} ${item.paciente?.apellidos}`.toLowerCase();
-    const motivo = item.ultima_consulta.motivo.toLowerCase();
-    const termino = busqueda.toLowerCase();
-    return nombrePaciente.includes(termino) || motivo.includes(termino) || (item.paciente?.cedula && item.paciente.cedula.includes(termino));
+  // ================= FILTROS =================
+  const agrupadasFiltradas = historiasAgrupadas.filter(item => {
+    const term = busqueda.toLowerCase();
+    return item.paciente.nombres.toLowerCase().includes(term) || 
+           item.paciente.apellidos.toLowerCase().includes(term) ||
+           (item.paciente.cedula && item.paciente.cedula.includes(term));
   });
+
+  const consultasDelPaciente = pacienteSeleccionado 
+    ? consultas.filter(c => c.id_paciente === pacienteSeleccionado.id) 
+    : [];
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
@@ -240,451 +225,414 @@ export default function Historias() {
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* SIDEBAR */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#111111] border-r border-slate-200 dark:border-white/5 flex flex-col justify-between
-        transform transition-all duration-300 ease-in-out
-        md:relative md:translate-x-0 w-64
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isCollapsed ? 'md:w-20' : 'md:w-64'}
-      `}>
+      {/* ================= SIDEBAR ================= */}
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#111111] border-r border-slate-200 dark:border-white/5 flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 w-64 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}>
         <div>
           <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
             <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-widest overflow-hidden whitespace-nowrap">
-              <span className="text-cyan-600 dark:text-cyan-400 text-2xl">*</span>
-              {!isCollapsed && <span>SOMA</span>}
+              <span className="text-cyan-600 dark:text-cyan-400 text-2xl">*</span>{!isCollapsed && <span>SOMA</span>}
             </h1>
-            {!isCollapsed && (
-              <button className="md:hidden text-slate-500 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}>
-                <X size={24} />
-              </button>
-            )}
+            {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
           </div>
 
           <div className={`py-6 ${isCollapsed ? 'px-2' : 'px-4'}`}>
             {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest">HERRAMIENTAS</p>}
             <nav className="space-y-2">
-              <Link to="/dashboard" title="Inicio" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Home size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap">Inicio</span>}
-              </Link>
-              <Link to="/pacientes" title="Pacientes" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Users size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap">Pacientes</span>}
-              </Link>
-              <Link to="/historias" title="Historias Clínicas" className={`flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <FileText size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap">Historias Clínicas</span>}
-              </Link>
-              <Link to="/agenda" title="Agenda" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Calendar size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap">Agenda</span>}
-              </Link>
+              <Link to="/dashboard" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}</Link>
+              <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}</Link>
+              <Link to="/historias" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors"><FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}</Link>
+              <Link to="/agenda" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Calendar size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}</Link>
             </nav>
           </div>
         </div>
 
-        <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
-          <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white">
-              {userData ? getInitials() : '...'}
-            </div>
-            {!isCollapsed && (
-              <div className="overflow-hidden">
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">Médico</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
-                </p>
-              </div>
-            )}
-          </div>
-          <button onClick={handleLogout} title="Cerrar Sesión" className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-            <LogOut size={20} className="shrink-0" />
-            {!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
-          </button>
+        <div className="p-4 border-t border-slate-200 dark:border-white/5 flex flex-col">
+          <button onClick={handleLogout} className="flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors"><LogOut size={20} className="shrink-0" />{!isCollapsed && <span>Cerrar Sesión</span>}</button>
         </div>
       </aside>
 
-      {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto w-full relative">
+      {/* ================= CONTENIDO PRINCIPAL ================= */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
         
-        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm sticky top-0 z-30">
+        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
-            <button className="text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-white transition-colors md:hidden" onClick={() => setIsSidebarOpen(true)}>
-              <Menu size={24} />
-            </button>
-            <button className="hidden md:flex p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-white transition-colors rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}>
-              <PanelLeft size={20} />
-            </button>
+            <button className="text-slate-500 dark:text-slate-400 hover:text-cyan-600 md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></button>
+            <button className="hidden md:flex p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={20} /></button>
           </div>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-yellow-400 transition-colors bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10">
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-yellow-400 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 transition-colors">
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
         </header>
 
-        <div className="p-6 lg:p-8 max-w-6xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Historias Clínicas</h2>
-            <p className="text-slate-500 dark:text-slate-400">Pacientes con historiales médicos activos.</p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div className="relative w-full sm:w-96">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Buscar por paciente o motivo..." 
-                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:text-white transition-all"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-              />
-            </div>
-            
-            <button 
-              onClick={() => {
-                setPacienteSeleccionado(null); 
-                setIsModalConsultaOpen(true);
-              }}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 transform hover:-translate-y-0.5"
-            >
-              <Plus size={20} /> Nueva Consulta
-            </button>
-          </div>
-
-          {/* TABLA PRINCIPAL DE HISTORIAS AGRUPADAS */}
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-            </div>
-          ) : historiasFiltradas.length === 0 ? (
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 rounded-2xl p-16 flex flex-col items-center justify-center text-center shadow-sm">
-              <div className="bg-emerald-50 dark:bg-emerald-500/10 p-4 rounded-full mb-4">
-                <ClipboardList size={40} className="text-emerald-500 dark:text-emerald-400" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">No hay historias registradas</h3>
-              <p className="text-slate-500 dark:text-slate-400 max-w-md">
-                {busqueda ? "No encontramos coincidencias." : "Empieza a registrar el historial médico de tus pacientes haciendo clic en 'Nueva Consulta'."}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-400 text-sm">
-                    <th className="p-4 font-semibold">Última Visita</th>
-                    <th className="p-4 font-semibold">Paciente</th>
-                    <th className="p-4 font-semibold">Último Motivo</th>
-                    <th className="p-4 font-semibold text-center">Total Visitas</th>
-                    <th className="p-4 font-semibold text-center">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-white/5">
-                  {historiasFiltradas.map((item) => (
-                    <tr key={item.paciente.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
-                      <td className="p-4 text-sm font-medium text-slate-900 dark:text-white">
-                        {new Date(item.ultima_consulta.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 font-bold text-xs">
-                            {item.paciente.nombres.charAt(0)}{item.paciente.apellidos.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white text-sm">{item.paciente.nombres} {item.paciente.apellidos}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{item.paciente.cedula}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-slate-600 dark:text-slate-300 max-w-xs truncate">{item.ultima_consulta.motivo}</td>
-                      <td className="p-4 text-center">
-                        <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded-md text-xs font-bold">
-                          {item.total_visitas}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <button 
-                          onClick={() => abrirExpediente(item.paciente)}
-                          title="Abrir Expediente"
-                          className="bg-slate-100 dark:bg-white/5 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors px-3 py-1.5 rounded-lg text-sm font-bold border border-slate-200 dark:border-white/5 flex items-center gap-2 mx-auto"
-                        >
-                          <FolderOpen size={16} /> Expediente
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* =========================================
-          MODAL: EXPEDIENTE DEL PACIENTE (CENTRO DE MANDO)
-          ========================================= */}
-      {pacienteSeleccionado && !tipoDocumento && !isModalConsultaOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white dark:bg-[#111111] w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col max-h-[90vh]">
-            
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-700 dark:text-cyan-400 font-bold text-2xl">
-                  {pacienteSeleccionado.nombres.charAt(0)}{pacienteSeleccionado.apellidos.charAt(0)}
+          {/* ========================================================
+              VISTA 1: LISTADO GLOBAL (AGRUPADO POR PACIENTE)
+              ======================================================== */}
+          {!isModalConsultaOpen && !pacienteSeleccionado && (
+            <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
+              <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
+                
+                {/* Cabecera Azul */}
+                <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div>
+                    <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Historias clínicas</h2>
+                    <p className="text-cyan-100 text-sm font-medium">Filtra por rango, busca por paciente y abre cada historia para verla.</p>
+                  </div>
+                  <button onClick={() => abrirEditorHistoria(null)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5 whitespace-nowrap">
+                    <Plus size={18} /> Nueva historia
+                  </button>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                    {pacienteSeleccionado.nombres} {pacienteSeleccionado.apellidos}
-                  </h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">C.I: {pacienteSeleccionado.cedula || 'N/A'}</p>
-                </div>
-              </div>
-              <button onClick={() => setPacienteSeleccionado(null)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-100 hover:bg-rose-50 dark:bg-white/5 dark:hover:bg-rose-500/10 rounded-full transition-colors">
-                <X size={24} />
-              </button>
-            </div>
 
-            <div className="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              <div className="lg:col-span-1 space-y-6">
-                <div className="bg-slate-50 dark:bg-[#1a1a1a] p-5 rounded-2xl border border-slate-200 dark:border-white/5">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4 uppercase tracking-wider">Acciones Clínicas</h3>
-                  <div className="space-y-3">
-                    
-                    <button 
-                      onClick={() => handleWhatsApp(pacienteSeleccionado.telefono)}
-                      className="w-full flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#20b958] text-white p-3.5 rounded-xl font-bold transition-all shadow-md shadow-green-500/20"
-                    >
-                      <MessageCircle size={20} /> Escribir al WhatsApp
-                    </button>
-
-                    <button 
-                      onClick={() => setIsModalConsultaOpen(true)}
-                      className="w-full flex items-center justify-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white p-3.5 rounded-xl font-bold transition-all shadow-md shadow-emerald-500/20"
-                    >
-                      <Stethoscope size={20} /> Nueva Consulta
-                    </button>
-
-                    <div className="grid grid-cols-2 gap-2 pt-2">
-                      <button 
-                        onClick={() => setTipoDocumento('recipe')}
-                        className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-[#222] border border-slate-200 dark:border-white/10 hover:border-cyan-500 dark:hover:border-cyan-500 text-slate-700 dark:text-slate-200 p-3 rounded-xl transition-all shadow-sm font-medium text-sm"
-                      >
-                        <Pill size={20} className="text-cyan-500" /> Récipe
-                      </button>
-                      <button 
-                        onClick={() => setTipoDocumento('constancia')}
-                        className="flex flex-col items-center justify-center gap-2 bg-white dark:bg-[#222] border border-slate-200 dark:border-white/10 hover:border-purple-500 dark:hover:border-purple-500 text-slate-700 dark:text-slate-200 p-3 rounded-xl transition-all shadow-sm font-medium text-sm"
-                      >
-                        <FileBadge size={20} className="text-purple-500" /> Constancia
-                      </button>
+                <div className="p-8">
+                  <div className="mb-6">
+                    <div className="flex justify-between items-end mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">Pacientes con Historial</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Última visita registrada</p>
+                      </div>
+                      <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1 rounded-full text-xs font-bold shadow-sm">
+                        {historiasAgrupadas.length} pacientes
+                      </span>
                     </div>
 
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                          type="text" 
+                          placeholder="Buscar por nombre, cédula o teléfono..." 
+                          className="w-full pl-11 pr-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:text-white text-sm shadow-sm"
+                          value={busqueda}
+                          onChange={(e) => setBusqueda(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-3 shrink-0">
+                        <button className="flex items-center gap-2 px-5 py-3 border border-slate-200 dark:border-white/10 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors font-bold text-sm shadow-sm"><Filter size={16} /> Filtros</button>
+                        <button className="bg-[#0081a7] hover:bg-[#006b8a] dark:bg-cyan-600 text-white px-8 py-3 rounded-xl font-bold shadow-md text-sm transition-colors">Buscar</button>
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="bg-slate-50 dark:bg-[#1a1a1a] p-5 rounded-2xl border border-slate-200 dark:border-white/5">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-3 uppercase tracking-wider">Datos Personales</h3>
-                  <ul className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
-                    <li className="flex justify-between border-b border-slate-200 dark:border-white/5 pb-2">
-                      <strong className="text-slate-800 dark:text-slate-300">Teléfono:</strong> 
-                      <span>{pacienteSeleccionado.telefono || 'N/A'}</span>
-                    </li>
-                    <li className="flex justify-between border-b border-slate-200 dark:border-white/5 pb-2">
-                      <strong className="text-slate-800 dark:text-slate-300">Sexo:</strong> 
-                      <span>{pacienteSeleccionado.sexo}</span>
-                    </li>
-                    <li className="flex justify-between border-b border-slate-200 dark:border-white/5 pb-2">
-                      <strong className="text-slate-800 dark:text-slate-300">Nacimiento:</strong> 
-                      <span>{new Date(pacienteSeleccionado.fecha_nacimiento).toLocaleDateString()}</span>
-                    </li>
-                  </ul>
+                  {loading ? (
+                    <div className="flex justify-center items-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0081a7]"></div></div>
+                  ) : agrupadasFiltradas.length === 0 ? (
+                    <div className="border-t border-slate-100 dark:border-white/5 py-16 flex flex-col items-center justify-center text-center">
+                      <ClipboardList size={40} className="text-slate-300 dark:text-slate-600 mb-4" />
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">No hay historias registradas</h3>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md">Empieza a registrar el historial de tus pacientes creando una nueva historia.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto border-t border-slate-100 dark:border-white/5 pt-4">
+                      <table className="w-full text-left whitespace-nowrap">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-white/10 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                            <th className="px-4 py-3">ÚLTIMA FECHA</th>
+                            <th className="px-4 py-3">PACIENTE</th>
+                            <th className="px-4 py-3">CÉDULA</th>
+                            <th className="px-4 py-3 hidden sm:table-cell">TELÉFONO</th>
+                            <th className="px-4 py-3 hidden md:table-cell">ÚLTIMO CONSULTORIO</th>
+                            <th className="px-4 py-3 text-center">HISTORIAL</th>
+                            <th className="px-4 py-3 text-right"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                          {agrupadasFiltradas.map((agrup) => (
+                            <tr key={agrup.paciente.id} className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors group cursor-pointer" onClick={() => verHistorialPaciente(agrup.paciente)}>
+                              
+                              <td className="px-4 py-4 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                                {formatearFechaTexto(agrup.ultima_consulta.fecha_consulta || agrup.ultima_consulta.created_at)}
+                              </td>
+                              
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-700 dark:text-cyan-400 font-bold text-xs shrink-0">
+                                    {agrup.paciente.nombres.charAt(0)}{agrup.paciente.apellidos.charAt(0)}
+                                  </div>
+                                  <p className="font-bold text-sm text-slate-900 dark:text-white">{agrup.paciente.nombres} {agrup.paciente.apellidos}</p>
+                                </div>
+                              </td>
+                              
+                              <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
+                                {agrup.paciente.cedula || '—'}
+                              </td>
+                              
+                              <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300 hidden sm:table-cell">
+                                {agrup.paciente.telefono || '—'}
+                              </td>
+
+                              <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300 hidden md:table-cell">
+                                {agrup.ultima_consulta.consultorio || '—'}
+                              </td>
+
+                              <td className="px-4 py-4 text-center">
+                                <span className="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800 px-3 py-1 rounded-full text-[10px] font-bold">
+                                  {agrup.total_visitas} registros
+                                </span>
+                              </td>
+                              
+                              <td className="px-4 py-4 text-right">
+                                <button onClick={(e) => { e.stopPropagation(); verHistorialPaciente(agrup.paciente); }} className="flex items-center gap-1.5 px-3 py-1.5 border border-cyan-200 dark:border-cyan-900 text-cyan-700 dark:text-cyan-400 rounded-full text-xs font-bold hover:bg-cyan-50 dark:hover:bg-cyan-900/40 transition-colors ml-auto">
+                                  <Eye size={14} /> Ver historial
+                                </button>
+                              </td>
+                              
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="lg:col-span-2">
-                <div className="flex items-center justify-between mb-4 bg-slate-50 dark:bg-[#1a1a1a] p-4 rounded-xl border border-slate-200 dark:border-white/5">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Activity size={20} className="text-emerald-500" /> Historial de Consultas
-                  </h3>
-                  <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-md font-bold text-sm">
-                    {historialPaciente.length} visitas
-                  </span>
+          {/* ========================================================
+              VISTA 2: LISTADO DE HISTORIAS DEL PACIENTE ESPECÍFICO
+              ======================================================== */}
+          {!isModalConsultaOpen && pacienteSeleccionado && (
+            <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
+              
+              <button onClick={() => setPacienteSeleccionado(null)} className="flex items-center gap-1.5 text-slate-500 hover:text-[#0081a7] font-bold text-sm mb-4 transition-colors">
+                <ArrowLeft size={16} /> Volver a todas las historias
+              </button>
+
+              <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
+                
+                <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-white/20 rounded-full border-2 border-white/10 flex items-center justify-center shrink-0">
+                      <User size={28} className="text-white opacity-80" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black text-white mb-1 tracking-tight">Historial de {pacienteSeleccionado.nombres}</h2>
+                      <p className="text-cyan-100 text-sm font-medium">C.I: {pacienteSeleccionado.cedula || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => abrirEditorHistoria(null, pacienteSeleccionado.id)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5 whitespace-nowrap">
+                    <Plus size={18} /> Nueva historia
+                  </button>
                 </div>
 
-                {historialPaciente.length === 0 ? (
-                  <div className="bg-white dark:bg-[#111111] p-10 rounded-2xl border border-dashed border-slate-300 dark:border-white/20 text-center flex flex-col items-center justify-center">
-                    <FileText size={40} className="text-slate-300 dark:text-slate-600 mb-3" />
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">No tiene consultas registradas aún.</p>
-                    <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">Usa el botón "Nueva Consulta" para empezar su historia.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4 pr-2">
-                    {historialPaciente.map((consulta) => (
-                      <div key={consulta.id} className="bg-white dark:bg-[#111111] p-5 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm relative overflow-hidden group hover:border-emerald-300 dark:hover:border-emerald-500/50 transition-colors">
-                        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500 group-hover:bg-emerald-400 transition-colors"></div>
-                        
-                        <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">{consulta.motivo}</h4>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 px-2 py-1 rounded font-medium whitespace-nowrap">
-                              {new Date(consulta.created_at).toLocaleDateString()}
-                            </span>
-                            {/* BOTÓN ELIMINAR CONSULTA */}
-                            <button 
-                              onClick={() => eliminarConsulta(consulta.id)} 
-                              className="text-slate-400 hover:text-rose-500 transition-colors bg-transparent hover:bg-rose-50 dark:hover:bg-rose-500/10 p-1.5 rounded-md"
-                              title="Eliminar esta consulta"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2 mt-3">
-                          {consulta.sintomas && (
-                            <p className="text-sm text-slate-600 dark:text-slate-400">
-                              <strong className="text-slate-800 dark:text-slate-300 block mb-0.5">Síntomas:</strong> {consulta.sintomas}
-                            </p>
-                          )}
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            <strong className="text-slate-800 dark:text-slate-300 block mb-0.5">Diagnóstico:</strong> {consulta.diagnostico || 'Pendiente'}
-                          </p>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">
-                            <strong className="text-slate-800 dark:text-slate-300 block mb-0.5">Tratamiento:</strong> {consulta.tratamiento || 'N/A'}
-                          </p>
+                <div className="p-8">
+                  {consultasDelPaciente.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <ClipboardList size={40} className="text-slate-300 dark:text-slate-600 mb-4" />
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Este paciente no tiene historias registradas</h3>
+                      <button onClick={() => abrirEditorHistoria(null, pacienteSeleccionado.id)} className="mt-4 text-cyan-600 font-bold hover:underline">Crear su primera evolución médica</button>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left whitespace-nowrap">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-white/10 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                            <th className="px-4 py-3">FECHA</th>
+                            <th className="px-4 py-3">CONSULTORIO</th>
+                            <th className="px-4 py-3">TIPO</th>
+                            <th className="px-4 py-3 text-right">ACCIÓN</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                          {consultasDelPaciente.map((c) => (
+                            <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors group">
+                              <td className="px-4 py-4 text-sm text-slate-900 dark:text-white font-bold">
+                                {formatearFechaTexto(c.fecha_consulta || c.created_at)}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
+                                {c.consultorio || '—'}
+                              </td>
+                              <td className="px-4 py-4">
+                                <span className="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1 rounded-full text-[10px] font-bold">
+                                  {c.motivo}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-right">
+                                <button onClick={() => abrirEditorHistoria(c)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ml-auto">
+                                  <Edit3 size={14} /> Ver / Editar
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================
+              VISTA 3: CREAR / EDITAR HISTORIA CLÍNICA (EL EDITOR)
+              ======================================================== */}
+          {isModalConsultaOpen && (
+            <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
+              <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden">
+                
+                {/* Cabecera Principal */}
+                {pacienteSeleccionado ? (
+                  <div className="bg-slate-100 dark:bg-[#161616] p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-700 font-bold text-lg shrink-0">
+                        {pacienteSeleccionado.nombres.charAt(0)}{pacienteSeleccionado.apellidos.charAt(0)}
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white">{pacienteSeleccionado.nombres} {pacienteSeleccionado.apellidos}</h2>
+                        <div className="flex gap-2 text-xs text-slate-500 font-medium">
+                          <span>C.I: {pacienteSeleccionado.cedula}</span>
+                          <span>•</span>
+                          <span>{pacienteSeleccionado.sexo}</span>
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================
-          MODAL: ESCRIBIR DOCUMENTO (RÉCIPE / CONSTANCIA)
-          ========================================= */}
-      {tipoDocumento && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white dark:bg-[#111111] w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col">
-            
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                {tipoDocumento === 'recipe' ? <Pill className="text-cyan-500" /> : <FileBadge className="text-purple-500" />}
-                {tipoDocumento === 'recipe' ? 'Redactar Récipe Médico' : 'Redactar Constancia Médica'}
-              </h2>
-              <button onClick={() => { setTipoDocumento(null); setTextoDocumento(''); }} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                Escribe lo que deseas que aparezca en el PDF para <strong>{pacienteSeleccionado?.nombres}</strong>. Esto no altera su historia guardada.
-              </p>
-              <textarea 
-                rows="6"
-                placeholder={tipoDocumento === 'recipe' ? "Ej: 1. Ibuprofeno 400mg cada 8 horas por 3 días..." : "Ej: Hago constar que el paciente asistió a consulta y requiere 2 días de reposo..."}
-                value={textoDocumento}
-                onChange={(e) => setTextoDocumento(e.target.value)}
-                className="w-full p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none"
-              ></textarea>
-            </div>
-
-            <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end bg-slate-50 dark:bg-[#0a0a0a] rounded-b-2xl">
-              <button onClick={() => { setTipoDocumento(null); setTextoDocumento(''); }} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
-                Atrás al Perfil
-              </button>
-              <button 
-                onClick={generarPDF}
-                disabled={textoDocumento.trim() === ''}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-md text-white disabled:opacity-50 ${tipoDocumento === 'recipe' ? 'bg-cyan-600 hover:bg-cyan-700 shadow-cyan-500/20' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-500/20'}`}
-              >
-                Generar y Descargar PDF
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* =========================================
-          MODAL: NUEVA CONSULTA 
-          ========================================= */}
-      {isModalConsultaOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white dark:bg-[#111111] w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col max-h-[90vh]">
-            
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Stethoscope className="text-emerald-500" /> Nueva Consulta Médica
-                </h2>
-                {pacienteSeleccionado && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Para: <strong>{pacienteSeleccionado.nombres} {pacienteSeleccionado.apellidos}</strong></p>
-                )}
-              </div>
-              <button onClick={() => setIsModalConsultaOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-100 hover:bg-rose-50 dark:bg-white/5 dark:hover:bg-rose-500/10 rounded-full transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto">
-              <form id="formConsulta" onSubmit={handleGuardarConsulta} className="space-y-5">
-                
-                {/* Mostrar <select> solo si NO venimos desde un Expediente */}
-                {!pacienteSeleccionado && (
-                  <div>
-                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Seleccionar Paciente *</label>
-                    <select required name="id_paciente" value={formData.id_paciente} onChange={handleChange} className="w-full mt-1.5 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all">
-                      <option value="">Buscar y seleccionar paciente...</option>
-                      {pacientesLista.map(p => (
-                        <option key={p.id} value={p.id}>{p.nombres} {p.apellidos} - C.I: {p.cedula}</option>
-                      ))}
+                ) : (
+                  <div className="p-6 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-2">Seleccionar Paciente *</label>
+                    <select 
+                      required 
+                      value={historiaData.id_paciente} 
+                      onChange={(e) => setHistoriaData({...historiaData, id_paciente: e.target.value})} 
+                      className="w-full max-w-md p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#111111] text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value="">Buscar paciente...</option>
+                      {pacientesLista.map(p => (<option key={p.id} value={p.id}>{p.nombres} {p.apellidos} - {p.cedula}</option>))}
                     </select>
                   </div>
                 )}
 
-                <div>
-                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Motivo de la Consulta *</label>
-                  <input required name="motivo" value={formData.motivo} onChange={handleChange} type="text" placeholder="Ej: Dolor abdominal intenso..." className="w-full mt-1.5 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+                {/* Sub-cabecera de Herramientas */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                      {historiaData.id ? 'Edit Historia Evolutiva' : 'Nueva Historia Evolutiva'}
+                    </h3>
+                    <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                      <span>Consulta <strong>{formatearFechaTexto(historiaData.fecha_consulta.split('T')[0])}</strong></span>
+                      <span className="bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 px-2 py-0.5 rounded text-[10px] font-black tracking-wider uppercase">
+                        {historiaData.id ? 'Guardado' : 'Borrador'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button className="hidden md:flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] shadow-sm transition-colors"><Maximize size={14} /> Modo Foco</button>
+                    <button onClick={() => setIsModalConsultaOpen(false)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] shadow-sm transition-colors"><X size={14} /> Cancelar</button>
+                    <button onClick={handleGuardarHistoria} disabled={guardando || !historiaData.id_paciente} className="flex items-center gap-1.5 px-5 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md transition-colors disabled:opacity-50">
+                      {guardando ? 'Guardando...' : <><Check size={14} /> Guardar</>}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Síntomas / Examen Físico</label>
-                  <textarea name="sintomas" value={formData.sintomas} onChange={handleChange} rows="3" placeholder="Detalle clínico..." className="w-full mt-1.5 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"></textarea>
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Diagnóstico</label>
-                  <textarea name="diagnostico" value={formData.diagnostico} onChange={handleChange} rows="2" placeholder="Diagnóstico presuntivo o definitivo..." className="w-full mt-1.5 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"></textarea>
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Tratamiento / Indicaciones</label>
-                  <textarea name="tratamiento" value={formData.tratamiento} onChange={handleChange} rows="3" placeholder="Plan de acción..." className="w-full mt-1.5 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/50 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none"></textarea>
-                </div>
-              </form>
-            </div>
 
-            <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end bg-slate-50 dark:bg-[#0a0a0a] rounded-b-2xl">
-              <button type="button" onClick={() => setIsModalConsultaOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
-                Cancelar
-              </button>
-              <button type="submit" form="formConsulta" disabled={guardando || (!pacienteSeleccionado && formData.id_paciente === '')} className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-emerald-500/20 disabled:opacity-50">
-                {guardando ? 'Guardando...' : 'Guardar Consulta'}
-              </button>
-            </div>
+                {/* Sub-pestañas internas */}
+                <div className="flex px-6 border-b border-slate-200 dark:border-white/5 text-sm font-bold text-slate-500 dark:text-slate-400 gap-6">
+                  <button className="py-3 hover:text-slate-800 dark:hover:text-white transition-colors">Ver historia clínica</button>
+                  <button className="py-3 border-b-[3px] border-[#0081a7] dark:border-cyan-500 text-[#0081a7] dark:text-cyan-400">Historia clínica</button>
+                  <button className="py-3 hover:text-slate-800 dark:hover:text-white transition-colors">Compartir</button>
+                </div>
 
-          </div>
+                {/* Formulario de Historia */}
+                <div className="p-6 md:p-8 space-y-8 bg-slate-50/50 dark:bg-[#0a0a0a]/50">
+                  
+                  {/* Bloque 1: Fecha y Lugar */}
+                  <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+                    <h4 className="font-bold text-slate-900 dark:text-white mb-6">Fecha y lugar de la consulta</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha de la consulta</label>
+                        <input 
+                          type="datetime-local" 
+                          value={historiaData.fecha_consulta} 
+                          onChange={(e) => setHistoriaData({...historiaData, fecha_consulta: e.target.value})}
+                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Próxima consulta <span className="font-normal text-slate-400">(opcional - agenda)</span></label>
+                        <input 
+                          type="datetime-local" 
+                          value={historiaData.proxima_consulta} 
+                          onChange={(e) => setHistoriaData({...historiaData, proxima_consulta: e.target.value})}
+                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Consultorio</label>
+                        <select 
+                          value={historiaData.consultorio} 
+                          onChange={(e) => setHistoriaData({...historiaData, consultorio: e.target.value})}
+                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
+                        >
+                          <option value="">Seleccione o escriba...</option>
+                          {listaConsultorios.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloque 2: Nota Clínica (WYSIWYG FAKE) */}
+                  <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
+                    <div className="mb-4">
+                      <h4 className="font-bold text-slate-900 dark:text-white">Nota clínica</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Contenido principal de la consulta.</p>
+                    </div>
+                    
+                    <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-[#0081a7] dark:text-cyan-400 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors mb-6">
+                      <FileSignature size={14} /> Seleccionar Plantilla
+                    </button>
+
+                    {/* Contenedor del Editor */}
+                    <div className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-[#111111]">
+                      {/* Menú Texto Superior */}
+                      <div className="hidden sm:flex items-center gap-4 px-4 py-2 text-[11px] font-medium text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                        <span className="cursor-pointer hover:text-cyan-500">Archivo</span>
+                        <span className="cursor-pointer hover:text-cyan-500">Editar</span>
+                        <span className="cursor-pointer hover:text-cyan-500">Ver</span>
+                        <span className="cursor-pointer hover:text-cyan-500">Insertar</span>
+                        <span className="cursor-pointer hover:text-cyan-500">Formato</span>
+                        <span className="cursor-pointer hover:text-cyan-500">Herramientas</span>
+                      </div>
+                      
+                      {/* Barra de Herramientas (Botones Funcionales para Inyectar Markdown/Texto) */}
+                      <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                        <select className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option>Párrafo</option></select>
+                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        <button type="button" onClick={() => insertTextAtCursor('**Texto Negrita**')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Negrita"><Bold size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('*Texto Cursiva*')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Cursiva"><Italic size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('__Texto Subrayado__')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Subrayado"><Underline size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('~~Texto Tachado~~')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Tachar"><Strikethrough size={14} /></button>
+                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        <button type="button" onClick={() => insertTextAtCursor('\n- Item 1\n- Item 2')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista de viñetas"><List size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('\n1. Item 1\n2. Item 2')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista numerada"><ListOrdered size={14} /></button>
+                      </div>
+
+                      {/* Área de Texto Editable */}
+                      <textarea 
+                        id="editorClinico"
+                        value={historiaData.nota_clinica}
+                        onChange={(e) => setHistoriaData({...historiaData, nota_clinica: e.target.value})}
+                        className="w-full min-h-[300px] p-6 text-sm text-slate-900 dark:text-white bg-white dark:bg-[#111111] outline-none resize-y custom-scrollbar leading-relaxed"
+                        placeholder="Escribe aquí el motivo de consulta, examen físico, diagnóstico..."
+                      ></textarea>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
-      )}
+      </main>
 
       <style>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
         }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
       `}</style>
     </div>
   );
