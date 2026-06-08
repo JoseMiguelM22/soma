@@ -6,7 +6,7 @@ import {
   Menu, Sun, Moon, Plus, Search, X, PanelLeft, ClipboardList, 
   Check, Maximize, FileSignature, AlignLeft, Bold, Italic, 
   Underline, Strikethrough, List, ListOrdered, Eye, Filter, ArrowLeft, Edit3,
-  Mic, MessageSquare, Undo, Redo, Paintbrush, ChevronDown, AlignCenter, AlignRight, AlignJustify, Link as LinkIcon, Image as ImageIcon, Zap, Type
+  Mic, MessageSquare, Undo, Redo, Paintbrush, ChevronDown, AlignCenter, AlignRight, AlignJustify, Link as LinkIcon, Image as ImageIcon, Zap, Type, Activity
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 
@@ -34,6 +34,8 @@ export default function Historias() {
   
   const notaRef = useRef(null); 
 
+  const plantillaHTML = `<b>Diagnóstico:</b><br><br><b>Tratamiento:</b><br><br><b>Subjetivo:</b><br><br><b>Objetivo:</b> Peso: &nbsp; Talla: &nbsp; IMC: &nbsp; TA: &nbsp; FC: &nbsp; Circunferencia de cintura: &nbsp; Dinamometro:<br><br><b>Plan Diagnóstico:</b><br><br><b>Plan Terapéutico:</b><br>`;
+
   // Estado para NUEVA o EDITAR Historia
   const [historiaData, setHistoriaData] = useState({
     id: null,
@@ -41,10 +43,10 @@ export default function Historias() {
     fecha_consulta: new Date().toISOString().slice(0, 16),
     proxima_consulta: '',
     consultorio: '',
-    nota_clinica: 'Diagnóstico:\n\nTratamiento:\n\nSubjetivo:\n\nObjetivo: Peso:   Talla:   IMC:   TA:   FC:   Circunferencia de cintura:   Dinamometro:\n\nPlan Diagnóstico:\n\nPlan Terapéutico:'
+    nota_clinica: plantillaHTML
   });
 
-  const listaConsultorios = ["Hospital Cardon"];
+  const listaConsultorios = ["Hospital Cardon" ];
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -94,6 +96,11 @@ export default function Historias() {
     navigate('/login');
   };
 
+  const getInitials = () => {
+    if (!userData || !userData.nombres || !userData.apellidos) return "DR";
+    return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
+  };
+
   const formatearFechaTexto = (fechaCompleta) => {
     if (!fechaCompleta) return '';
     const fecha = new Date(fechaCompleta);
@@ -104,22 +111,42 @@ export default function Historias() {
     return `${dia} de ${meses[fecha.getMonth()]} de ${fecha.getFullYear()} a las ${horas}:${minutos}`;
   };
 
-  // ================= LÓGICA DEL EDITOR DE TEXTO =================
-  const insertTextAtCursor = (textToInsert) => {
-    const textarea = notaRef.current;
-    if (!textarea) return;
-    
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = historiaData.nota_clinica;
-    
-    const newText = text.substring(0, start) + textToInsert + text.substring(end);
-    setHistoriaData({ ...historiaData, nota_clinica: newText });
-    
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
-    }, 0);
+  // ================= LÓGICA DEL EDITOR TIPO WORD =================
+  useEffect(() => {
+    if (isModalConsultaOpen && notaRef.current) {
+      notaRef.current.innerHTML = historiaData.nota_clinica;
+    }
+  }, [isModalConsultaOpen, historiaData.id]);
+
+  const ejecutarComando = (comando, valor = null) => {
+    document.execCommand(comando, false, valor);
+    if (notaRef.current) {
+      notaRef.current.focus();
+      setHistoriaData({...historiaData, nota_clinica: notaRef.current.innerHTML});
+    }
+  };
+
+  const BotonHerramienta = ({ icon: Icon, comando, className = "", title="" }) => (
+    <button 
+      type="button" 
+      title={title}
+      onMouseDown={(e) => { e.preventDefault(); ejecutarComando(comando); }}
+      className={`p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded ${className}`}
+    >
+      <Icon size={14} />
+    </button>
+  );
+
+  const insertarEnlace = (e) => {
+    e.preventDefault();
+    const url = prompt("Introduce el enlace:");
+    if (url) ejecutarComando("createLink", url);
+  };
+
+  const insertarImagen = (e) => {
+    e.preventDefault();
+    const url = prompt("Introduce la URL de la imagen:");
+    if (url) ejecutarComando("insertImage", url);
   };
 
   // ================= DICTADO POR VOZ CON IA =================
@@ -140,15 +167,11 @@ export default function Historias() {
 
       recognition.onresult = (event) => {
         let finalTranscript = '';
-
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
+          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
         }
-        
         if (finalTranscript !== '') {
-          insertTextAtCursor(' ' + finalTranscript);
+          ejecutarComando('insertText', ' ' + finalTranscript);
         }
       };
 
@@ -158,18 +181,23 @@ export default function Historias() {
       };
 
       recognition.onend = () => {
-        if (isListening) {
-          recognition.start();
-        }
+        if (isListening) recognition.start();
       };
 
       recognition.start();
     }
   };
 
-  // ================= EXPORTACIÓN: PDF Y WHATSAPP =================
+  // ================= EXPORTACIÓN: LIMPIEZA DE HTML, PDF Y WHATSAPP =================
+  const stripHtmlToText = (html) => {
+    let tmp = document.createElement("DIV");
+    tmp.innerHTML = html.replace(/<br\s*[\/]?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n").replace(/<\/li>/gi, "\n");
+    return (tmp.textContent || tmp.innerText || "").replace(/^\s*[\r\n]/gm, "");
+  };
+
   const descargarPDFHistoria = () => {
-    if (!historiaData.nota_clinica.trim()) return alert("La nota clínica está vacía.");
+    const textoLimpio = stripHtmlToText(historiaData.nota_clinica);
+    if (!textoLimpio.trim()) return alert("La nota clínica está vacía.");
     const doc = new jsPDF();
     
     doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(0, 130, 160);
@@ -196,7 +224,7 @@ export default function Historias() {
     doc.setFont("helvetica", "normal"); doc.text(pacienteInfo, 40, 55);
     doc.line(20, 62, 190, 62);
 
-    doc.text(doc.splitTextToSize(historiaData.nota_clinica, 170), 20, 72);
+    doc.text(doc.splitTextToSize(textoLimpio, 170), 20, 72);
     
     doc.setFontSize(9); doc.setTextColor(150, 150, 150);
     doc.text("Generado por SOMA Cloud", 105, 280, { align: "center" });
@@ -222,7 +250,8 @@ export default function Historias() {
     if (num.startsWith('0')) num = '58' + num.substring(1);
     else if (!num.startsWith('58') && num.length === 10) num = '58' + num;
 
-    const mensaje = `Hola ${nombre}, aquí tienes el resumen de tu consulta:\n\n${historiaData.nota_clinica}`;
+    const textoLimpio = stripHtmlToText(historiaData.nota_clinica);
+    const mensaje = `Hola ${nombre}, aquí tienes el resumen de tu consulta:\n\n${textoLimpio}`;
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
@@ -240,7 +269,7 @@ export default function Historias() {
         fecha_consulta: consulta.fecha_consulta || consulta.created_at.slice(0, 16),
         proxima_consulta: consulta.proxima_consulta || '',
         consultorio: consulta.consultorio || '',
-        nota_clinica: consulta.nota_clinica || consulta.sintomas || '' 
+        nota_clinica: consulta.nota_clinica || consulta.sintomas || plantillaHTML
       });
     } else {
       setHistoriaData({
@@ -249,7 +278,7 @@ export default function Historias() {
         fecha_consulta: new Date().toISOString().slice(0, 16),
         proxima_consulta: '',
         consultorio: '',
-        nota_clinica: 'Diagnóstico:\n\nTratamiento:\n\nSubjetivo:\n\nObjetivo: Peso:   Talla:   IMC:   TA:   FC:   Circunferencia de cintura:   Dinamometro:\n\nPlan Diagnóstico:\n\nPlan Terapéutico:'
+        nota_clinica: plantillaHTML
       });
     }
     setIsModalConsultaOpen(true);
@@ -304,13 +333,13 @@ export default function Historias() {
   const consultasDelPaciente = pacienteSeleccionado ? consultas.filter(c => c.id_paciente === pacienteSeleccionado.id) : [];
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
+    <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
       
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* ================= SIDEBAR ================= */}
+      {/* ================= SIDEBAR FLOTANTE Y REDONDEADO ================= */}
       <aside 
         className={`
           fixed inset-y-0 left-0 z-50 
@@ -323,56 +352,95 @@ export default function Historias() {
           shadow-xl shadow-slate-200/50 dark:shadow-none
           ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
           ${isCollapsed ? 'md:w-24' : 'md:w-68'}
-        `}>
+        `}
+      >
         <div>
-          <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
+          {/* Logo SOMA Dinámico */}
+          <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
             <Link to="/dashboard" className="flex items-center overflow-hidden whitespace-nowrap">
               {isCollapsed ? (
                 <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
               ) : (
                 <>
-                  <img src="/soma_logo.png" alt="SOMA" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
-                  <img src="/soma_logo_blanco.png" alt="SOMA" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
+                  <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
                 </>
               )}
             </Link>
-            {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
+            {!isCollapsed && (
+              <button className="md:hidden text-slate-400 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
-          <div className={`py-6 ${isCollapsed ? 'px-2' : 'px-4'}`}>
-            {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest">HERRAMIENTAS</p>}
-            <nav className="space-y-2">
-              <Link to="/dashboard" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}</Link>
-              <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}</Link>
-              <Link to="/historias" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors"><FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}</Link>
-              <Link to="/agenda" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Calendar size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}</Link>
+          {/* Menú: Herramientas */}
+          <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
+            <nav className="space-y-1.5">
+              <Link to="/dashboard" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Home size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
+              </Link>
+              <Link to="/pacientes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Users size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Pacientes</span>}
+              </Link>
+              <Link to="/historias" className={`flex items-center gap-3 py-3 bg-emerald-500/10 dark:bg-white/10 text-emerald-600 dark:text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <FileText size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Historias Clínicas</span>}
+              </Link>
+              <Link to="/agenda" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Calendar size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
+              </Link>
+              <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Activity size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadísticas</span>}
+              </Link>
             </nav>
           </div>
-           {/* Menú: Configuración */}
-                    <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
-                      {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
-                      <nav className="space-y-1.5">
-                        <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                          <User size={20} className="shrink-0" />
-                          {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
-                        </Link>
-                        <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                          <Settings size={20} className="shrink-0" />
-                          {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
-                        </Link>
-                      </nav>
-                    </div>
+
+          {/* Menú: Configuración */}
+          <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
+            <nav className="space-y-1.5">
+              <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <User size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
+              </Link>
+              <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Settings size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
+              </Link>
+            </nav>
+          </div>
         </div>
 
-        
-
-        <div className="p-4 border-t border-slate-200 dark:border-white/5 flex flex-col">
-          <button onClick={handleLogout} className="flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors"><LogOut size={20} className="shrink-0" />{!isCollapsed && <span>Cerrar Sesión</span>}</button>
+        {/* Footer del Sidebar */}
+        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+          <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-white/20">
+              {getInitials()}
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Médico</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+                  {userData?.nombres || 'Miguel'} {userData?.apellidos || 'Gómez'}
+                </p>
+              </div>
+            )}
+          </div>
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-400 dark:text-slate-500 hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+            <LogOut size={18} className="shrink-0" />
+            {!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}
+          </button>
         </div>
       </aside>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#0B0D12]">
         
         <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
@@ -386,7 +454,9 @@ export default function Historias() {
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           
-          {/* VISTA 1: LISTADO GLOBAL */}
+          {/* ========================================================
+              VISTA 1: LISTADO GLOBAL (AGRUPADO POR PACIENTE)
+              ======================================================== */}
           {!isModalConsultaOpen && !pacienteSeleccionado && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
@@ -505,7 +575,9 @@ export default function Historias() {
             </div>
           )}
 
-          {/* VISTA 2: LISTADO DE HISTORIAS DEL PACIENTE ESPECÍFICO */}
+          {/* ========================================================
+              VISTA 2: LISTADO DE HISTORIAS DEL PACIENTE ESPECÍFICO
+              ======================================================== */}
           {!isModalConsultaOpen && pacienteSeleccionado && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               
@@ -578,7 +650,9 @@ export default function Historias() {
             </div>
           )}
 
-          {/* VISTA 3: CREAR / EDITAR HISTORIA CLÍNICA (EL EDITOR PREMIUM) */}
+          {/* ========================================================
+              VISTA 3: CREAR / EDITAR HISTORIA CLÍNICA (EL EDITOR PREMIUM)
+              ======================================================== */}
           {isModalConsultaOpen && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden">
@@ -718,60 +792,60 @@ export default function Historias() {
                     {/* Contenedor del Editor Exacto a la Foto */}
                     <div className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-[#111111]">
                       
-                      {/* Menú Texto Superior */}
+                      {/* Menú Texto Superior: Con interacciones */}
                       <div className="hidden sm:flex items-center justify-between px-4 py-2 text-[11px] font-medium text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
                         <div className="flex gap-4">
-                          <span className="cursor-pointer hover:text-cyan-500">Archivo</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Editar</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Ver</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Insertar</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Formato</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Herramientas</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Tabla</span>
-                          <span className="cursor-pointer hover:text-cyan-500">Ayuda</span>
+                          <span onClick={descargarPDFHistoria} className="cursor-pointer hover:text-cyan-500">Archivo</span>
+                          <span onClick={() => ejecutarComando('undo')} className="cursor-pointer hover:text-cyan-500">Editar</span>
+                          <span onClick={() => alert('Modo Foco activado (Pulsa F11 para pantalla completa)')} className="cursor-pointer hover:text-cyan-500">Ver</span>
+                          <span onClick={insertarImagen} className="cursor-pointer hover:text-cyan-500">Insertar</span>
+                          <span onClick={() => ejecutarComando('removeFormat')} className="cursor-pointer hover:text-cyan-500">Formato</span>
+                          <span onClick={toggleDictado} className="cursor-pointer hover:text-cyan-500">Herramientas</span>
+                          <span onClick={() => alert('¡Próximamente: Inserción de tablas de signos vitales!')} className="cursor-pointer hover:text-cyan-500">Tabla</span>
+                          <span onClick={() => alert('Centro de Ayuda SOMA Cloud')} className="cursor-pointer hover:text-cyan-500">Ayuda</span>
                         </div>
                         <span className="flex items-center gap-1 text-orange-500 font-bold cursor-pointer hover:underline">
                           <Zap size={12} /> Upgrade
                         </span>
                       </div>
                       
-                      {/* Barra de Herramientas */}
+                      {/* Barra de Herramientas (Los botones de iconos) */}
                       <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Undo size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Redo size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Paintbrush size={14} /></button>
+                        <BotonHerramienta icon={Undo} comando="undo" title="Deshacer" />
+                        <BotonHerramienta icon={Redo} comando="redo" title="Rehacer" />
+                        <BotonHerramienta icon={Paintbrush} comando="removeFormat" title="Limpiar Formato" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <select className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option>Párrafo</option></select>
+                        <select onChange={(e) => { e.preventDefault(); ejecutarComando('formatBlock', e.target.value); }} className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option value="P">Párrafo</option><option value="H1">Título 1</option><option value="H2">Título 2</option></select>
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <select className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option>12pt</option></select>
+                        <select onChange={(e) => { e.preventDefault(); ejecutarComando('fontSize', e.target.value); }} className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option value="3">12pt</option><option value="4">14pt</option><option value="5">18pt</option></select>
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button type="button" onClick={() => insertTextAtCursor('**Texto Negrita**')} className="p-1.5 text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded" title="Negrita"><Bold size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('*Texto Cursiva*')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Cursiva"><Italic size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('__Texto Subrayado__')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Subrayado"><Underline size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('~~Texto Tachado~~')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Tachar"><Strikethrough size={14} /></button>
+                        <BotonHerramienta icon={Bold} comando="bold" className="text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30" title="Negrita" />
+                        <BotonHerramienta icon={Italic} comando="italic" title="Cursiva" />
+                        <BotonHerramienta icon={Underline} comando="underline" title="Subrayado" />
+                        <BotonHerramienta icon={Strikethrough} comando="strikeThrough" title="Tachado" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignLeft size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignCenter size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignRight size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignJustify size={14} /></button>
+                        <BotonHerramienta icon={AlignLeft} comando="justifyLeft" title="Alinear Izquierda" />
+                        <BotonHerramienta icon={AlignCenter} comando="justifyCenter" title="Centrar" />
+                        <BotonHerramienta icon={AlignRight} comando="justifyRight" title="Alinear Derecha" />
+                        <BotonHerramienta icon={AlignJustify} comando="justifyFull" title="Justificar" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button type="button" onClick={() => insertTextAtCursor('\n- Item 1\n- Item 2')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista de viñetas"><List size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('\n1. Item 1\n2. Item 2')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista numerada"><ListOrdered size={14} /></button>
+                        <BotonHerramienta icon={List} comando="insertUnorderedList" title="Viñetas" />
+                        <BotonHerramienta icon={ListOrdered} comando="insertOrderedList" title="Numeración" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><LinkIcon size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><ImageIcon size={14} /></button>
-                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Type size={14} className="border-b-2 border-black dark:border-white" /></button>
+                        <button type="button" onMouseDown={insertarEnlace} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Enlace"><LinkIcon size={14} /></button>
+                        <button type="button" onMouseDown={insertarImagen} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Imagen"><ImageIcon size={14} /></button>
+                        <BotonHerramienta icon={Type} comando="removeFormat" className="border-b-2 border-black dark:border-white" title="Texto" />
                       </div>
 
                       {/* Área de Texto Editable */}
-                      <textarea 
+                      <div 
                         id="editorClinico"
                         ref={notaRef}
-                        value={historiaData.nota_clinica}
-                        onChange={(e) => setHistoriaData({...historiaData, nota_clinica: e.target.value})}
-                        className="w-full min-h-[400px] p-6 text-[15px] font-medium text-slate-900 dark:text-white bg-white dark:bg-[#111111] outline-none resize-y custom-scrollbar leading-relaxed"
-                        placeholder="Escribe aquí el motivo de consulta, examen físico, diagnóstico..."
-                      ></textarea>
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={(e) => setHistoriaData({...historiaData, nota_clinica: e.currentTarget.innerHTML})}
+                        className="w-full min-h-[400px] p-6 text-[15px] font-medium text-slate-900 dark:text-white bg-white dark:bg-[#111111] outline-none overflow-y-auto custom-scrollbar leading-relaxed cursor-text"
+                      ></div>
                     </div>
                   </div>
 

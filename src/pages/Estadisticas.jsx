@@ -139,7 +139,7 @@ export default function Estadisticas() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-100 dark:bg-[#090a0f] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
+    <div className="flex h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
       {/* OVERLAY PARA MÓVIL */}
       {isSidebarOpen && (
@@ -169,8 +169,8 @@ export default function Estadisticas() {
                 <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
               ) : (
                 <>
-                  <img src="/soma_logo.jpg" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
-                  <img src="/soma_logo_blanco.jpg" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
+                  <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
                 </>
               )}
             </Link>

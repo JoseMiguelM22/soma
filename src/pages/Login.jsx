@@ -164,18 +164,20 @@ export default function Login() {
 
           {/* Logo móvil */}
           <div className="lg:hidden flex justify-center mb-10">
-             {/* Modo Claro (Logo Negro) */}
-                 <img src="/soma_logo.png" alt="SOMA Logo" className="h-15 object-contain block dark:hidden transition-opacity duration-300" />
+             {/* Modo Claro (Logo Negro) 
+                 <img src="/soma_logo.png" alt="SOMA Logo" className="h-15 object-contain block dark:hidden transition-opacity duration-300" /> */}
+
                   {/* Modo Oscuro (Logo Blanco) */}
-                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-15 object-contain hidden dark:block transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-15 object-contain dark:block transition-opacity duration-300" />
           </div>
 
           {/* Logo escritorio */}
           <div className="hidden lg:block text-center">
-             {/* Modo Claro (Logo Negro) */}
-                 <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-8 object-contain block dark:hidden transition-opacity duration-300" />
+             {/* Modo Claro (Logo Negro) 
+                 <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-8 object-contain block dark:hidden transition-opacity duration-300" /> */}
+
                   {/* Modo Oscuro (Logo Blanco) */}
-                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-10 mx-auto mb-8 object-contain hidden dark:block transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-11 mx-auto mb-8 object-contain dark:block transition-opacity duration-300" />
           </div>
 
           <div className="text-center mb-10">
@@ -323,6 +325,11 @@ export default function Login() {
               >
                 Crear Cuenta
               </Link>
+
+              <div className="flex justify-center items-center w-full">
+             <Link to="/" className="text-xs font-bold text-slate-500 flex items-center gap-1.5 hover:text-white transition-colors group mt-2"><ArrowLeft size={19} className="group-hover:-translate-x-1 transition-transform" /> 
+               Volver al inicio
+                </Link></div>
             </p>
           </div>
 

@@ -5,8 +5,9 @@ import {
   Home, Users, FileText, Calendar, User, Settings, LogOut, 
   Menu, Sun, Moon, Plus, Search, MoreVertical, X, PanelLeft, 
   Filter, Edit3, ClipboardList, Check, ChevronDown, Phone, 
-  FileDigit, CalendarDays, FlaskConical,
-  Maximize, FileSignature, AlignLeft, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Type, Download
+  FileDigit, CalendarDays, FlaskConical, Maximize, FileSignature, 
+  AlignLeft, Bold, Italic, Underline, Strikethrough, List, 
+  ListOrdered, Type, Download, Activity
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 
@@ -38,7 +39,7 @@ export default function Pacientes() {
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [pacientes, setPacientes] = useState([]);
-  const [consultasPaciente, setConsultasPaciente] = useState([]); // <-- Nuevo estado para contar consultas
+  const [consultasPaciente, setConsultasPaciente] = useState([]); 
   const [loadingPacientes, setLoadingPacientes] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -61,9 +62,7 @@ export default function Pacientes() {
     nota_clinica: 'Diagnostico:\n\n'
   });
 
-  const listaConsultorios = [
-    "Hospital Cardon"
-  ];
+  const listaConsultorios = ["Hospital Cardon"];
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -89,7 +88,6 @@ export default function Pacientes() {
     setLoadingPacientes(false);
   };
 
-  // Cargar las consultas de un paciente específico para el "Dashboard del paciente"
   const cargarConsultasPaciente = async (idPaciente) => {
     const { data } = await supabase
       .from('consultas')
@@ -187,7 +185,7 @@ export default function Pacientes() {
 
       if (error) throw error;
       alert("¡Historia guardada con éxito!");
-      cargarConsultasPaciente(pacienteSeleccionado.id); // Actualizar los contadores al instante
+      cargarConsultasPaciente(pacienteSeleccionado.id); 
       setHistoriaView('list');
     } catch (error) {
       alert("Error al guardar la historia. Verifica las columnas en Supabase.");
@@ -205,13 +203,10 @@ export default function Pacientes() {
     }
 
     const doc = new jsPDF();
-
     doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(0, 130, 160);
     doc.text("SOMA Cloud", 105, 20, { align: "center" });
-
     doc.setFontSize(14); doc.setTextColor(50, 50, 50);
     doc.text(tipoDocumento === 'recipe' ? 'RÉCIPE E INDICACIONES' : 'CONSTANCIA MÉDICA', 105, 30, { align: "center" });
-
     doc.setLineWidth(0.5); doc.setDrawColor(200, 200, 200); doc.line(20, 35, 190, 35);
     doc.setFontSize(11); doc.setFont("helvetica", "normal");
     doc.text(`Médico: Dr(a). ${userData?.nombres || ''} ${userData?.apellidos || ''}`, 20, 45);
@@ -231,16 +226,13 @@ export default function Pacientes() {
       const colWidth = 80; 
       const startXLeft = 20; 
       const startXRight = 110; 
-
       doc.setFont("helvetica", "bold"); 
       doc.text("Medicación:", startXLeft, currentY); 
       doc.text("Indicaciones al paciente:", startXRight, currentY); 
       currentY += 7;
-      
       doc.setFont("helvetica", "normal");
       const arrRecipe = doc.splitTextToSize(textoRecipe, colWidth);
       const arrIndicaciones = doc.splitTextToSize(textoIndicaciones, colWidth);
-      
       doc.text(arrRecipe, startXLeft, currentY);
       doc.text(arrIndicaciones, startXRight, currentY);
     } else {
@@ -249,7 +241,6 @@ export default function Pacientes() {
 
     doc.setFontSize(9); doc.setTextColor(150, 150, 150);
     doc.text("Generado automáticamente por SOMA Cloud", 105, 280, { align: "center" });
-    
     doc.save(`${tipoDocumento === 'recipe' ? 'Recipe' : 'Constancia'}_${pacienteSeleccionado?.nombres || 'Paciente'}.pdf`);
     
     if (tipoDocumento === 'recipe') { setTextoRecipe(''); setTextoIndicaciones(''); setRecipeView('list'); }
@@ -288,7 +279,6 @@ export default function Pacientes() {
     return `${day} ${meses[parseInt(month)-1]} ${year}`;
   };
 
-  // Formato: "05 de Junio de 2026 a las 18:06"
   const formatearFechaTextoCompleta = (fechaCompleta) => {
     if (!fechaCompleta) return '';
     const fecha = new Date(fechaCompleta);
@@ -315,40 +305,115 @@ export default function Pacientes() {
   );
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
+    <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
       
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* ================= SIDEBAR ================= */}
-      <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#111111] border-r border-slate-200 dark:border-white/5 flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 w-64 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}>
+      {/* ================= SIDEBAR FLOTANTE Y REDONDEADO ================= */}
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 
+          bg-white dark:bg-[#16161a] 
+          border-r border-slate-200/80 dark:border-white/[0.04] 
+          flex flex-col justify-between 
+          transform transition-all duration-300 ease-in-out 
+          md:relative md:translate-x-0
+          md:m-4 md:mr-0 md:rounded-3xl 
+          shadow-xl shadow-slate-200/50 dark:shadow-none
+          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
+          ${isCollapsed ? 'md:w-24' : 'md:w-68'}
+        `}
+      >
         <div>
-          <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-widest overflow-hidden whitespace-nowrap">
-              <span className="text-cyan-600 dark:text-cyan-400 text-2xl">*</span>{!isCollapsed && <span>SOMA</span>}
-            </h1>
-            {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
+          {/* Logo SOMA Dinámico */}
+          <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
+            <Link to="/dashboard" className="flex items-center overflow-hidden whitespace-nowrap">
+              {isCollapsed ? (
+                <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
+              ) : (
+                <>
+                  <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  {/* Modo Oscuro (Logo Blanco) */}
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
+                </>
+              )}
+            </Link>
+            {!isCollapsed && (
+              <button className="md:hidden text-slate-400 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
-          <div className={`py-6 ${isCollapsed ? 'px-2' : 'px-4'}`}>
-            {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest">HERRAMIENTAS</p>}
-            <nav className="space-y-2">
-              <Link to="/dashboard" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}</Link>
-              <Link to="/pacientes" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors"><Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}</Link>
-              <Link to="/historias" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}</Link>
-              <Link to="/agenda" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Calendar size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}</Link>
+          {/* Menú: Herramientas */}
+          <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
+            <nav className="space-y-1.5">
+              <Link to="/dashboard" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Home size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
+              </Link>
+              <Link to="/pacientes" className={`flex items-center gap-3 py-3 bg-emerald-500/10 dark:bg-white/10 text-emerald-600 dark:text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Users size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Pacientes</span>}
+              </Link>
+              <Link to="/historias" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <FileText size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Historias Clínicas</span>}
+              </Link>
+              <Link to="/agenda" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Calendar size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
+              </Link>
+              <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Activity size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadísticas</span>}
+              </Link>
+            </nav>
+          </div>
+
+          {/* Menú: Configuración */}
+          <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
+            <nav className="space-y-1.5">
+              <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <User size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
+              </Link>
+              <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Settings size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
+              </Link>
             </nav>
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-200 dark:border-white/5 flex flex-col">
-          <button onClick={handleLogout} className="flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors"><LogOut size={20} className="shrink-0" />{!isCollapsed && <span>Cerrar Sesión</span>}</button>
+        {/* Footer del Sidebar */}
+        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+          <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-white/20">
+              {getInitials()}
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Médico</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+                  {userData?.nombres || 'Miguel'} {userData?.apellidos || 'Gómez'}
+                </p>
+              </div>
+            )}
+          </div>
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-400 dark:text-slate-500 hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+            <LogOut size={18} className="shrink-0" />
+            {!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}
+          </button>
         </div>
       </aside>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#0B0D12]">
         
         <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
@@ -424,7 +489,7 @@ export default function Pacientes() {
                               <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hidden sm:table-cell">{paciente.telefono || '-'}</td>
                               <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-2">
-                                  <button onClick={() => { abrirPerfil(paciente); setActiveTab('historias'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 rounded-md text-xs font-bold hover:bg-cyan-100 transition-colors"><User size={14} /> Historias</button>
+                                  <button onClick={() => { abrirPerfil(paciente); setActiveTab('historias'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 rounded-md text-xs font-bold hover:bg-cyan-100 transition-colors"><FileText size={14} /> Historias</button>
                                   <button onClick={() => { abrirPerfil(paciente); setIsEditingData(true); }} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-50 transition-colors"><Edit3 size={14} /> Editar</button>
                                 </div>
                               </td>
@@ -767,7 +832,7 @@ export default function Pacientes() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Correo electrónico</label>
-                      <input type="email" name="correo" value={formData.correo} onChange={(e) => handleInputChange(e, false)} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500" placeholder="correo@ejemplo.com" />
+                      <input type="email" name="correo" value={formData.correo} onChange={(e) => handleInputChange(e, false)} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#0B0D12] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500" placeholder="correo@ejemplo.com" />
                     </div>
                   </div>
                 </div>
@@ -775,7 +840,7 @@ export default function Pacientes() {
               </form>
             </div>
             
-            <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end bg-white dark:bg-[#111111] rounded-b-2xl">
+            <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end bg-white dark:bg-[#0B0D12] rounded-b-2xl">
               <button type="button" onClick={() => setIsModalCrearOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">Cancelar</button>
               <button type="submit" form="formPacienteN" disabled={guardando} className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-2.5 rounded-xl font-bold shadow-md disabled:opacity-50">
                 {guardando ? 'Guardando...' : 'Guardar Paciente'}

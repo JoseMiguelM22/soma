@@ -8,6 +8,7 @@ import ActualizarContrasena from './pages/ActualizarContrasena';
 import Historias from './pages/Historias';
 import Agendas from './pages/Agendas';
 import Estadisticas from './pages/Estadisticas';
+import Perfil from './pages/Perfil';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
       <Route path="/historias" element={<Historias />} />
       <Route path="/agenda" element={<Agendas />} />
       <Route path="/estadisticas" element={<Estadisticas />} />
+      <Route path="/perfil" element={<Perfil />} />
      
     </Routes>
   )

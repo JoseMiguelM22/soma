@@ -91,7 +91,7 @@ export default function Dashboard() {
   }
 
   return (
-  <div className="flex h-screen bg-slate-100 dark:bg-[#090a0f] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
+  <div className="flex h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
       {/* OVERLAY PARA MÓVIL */}
       {isSidebarOpen && (
@@ -235,17 +235,17 @@ export default function Dashboard() {
             <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              <Link to="/pacientes" className="flex items-center justify-center gap-3 p-8 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[2rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+              <Link to="/pacientes" className="flex items-center justify-center gap-3 p-20 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
                 <UserPlus size={28} />
                 <span className="text-xl">Crear Paciente</span>
               </Link>
               
-              <Link to="/historias" className="flex items-center justify-center gap-3 p-8 bg-[#10b981] hover:bg-[#059669] text-white rounded-[2rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+              <Link to="/historias" className="flex items-center justify-center gap-3 p-20 bg-[#10b981] hover:bg-[#059669] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
                 <FilePlus size={28} />
                 <span className="text-xl">Crear Consulta</span>
               </Link>
               
-              <Link to="/agenda" className="flex items-center justify-center gap-3 p-8 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[2rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+              <Link to="/agenda" className="flex items-center justify-center gap-3 p-20 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
                 <CalendarPlus size={28} />
                 <span className="text-xl">Agendar Cita</span>
               </Link>

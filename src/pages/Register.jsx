@@ -237,10 +237,12 @@ export default function Register() {
                 <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-12 object-contain hidden dark:block transition-opacity duration-300" />
               </div>
 
-              {/* Logo escritorio */}
+             
               <div className="hidden lg:block text-center">
-                <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain block dark:hidden transition-opacity duration-300" />
-                <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain hidden dark:block transition-opacity duration-300" />
+                 {/* Logo escritorio 
+                <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain block dark:hidden transition-opacity duration-300" /> */}
+
+                <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain dark:block transition-opacity duration-300" />
               </div>
 
               <div className="text-center mb-8">

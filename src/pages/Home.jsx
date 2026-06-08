@@ -20,7 +20,8 @@ export default function Home() {
       
       {/* --- PANTALLA DE CARGA --- */}
       <div className={`fixed inset-0 z-[10000] flex items-center justify-center bg-[#121212] transition-all duration-700 ease-in-out ${isLoading ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-        <div className="text-[#b0ff4c] text-4xl font-black animate-pulse tracking-widest">SOMA</div>
+            {/* Modo Oscuro (Logo Blanco) */}
+             <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-12 object-contain dark:block transition-opacity duration-300" />
       </div>
 
       {/* ==========================================
@@ -70,12 +71,28 @@ export default function Home() {
           BARRA MARQUEE (CINTA VERDE ANIMADA)
           ========================================== */}
       <div className="bg-[#b0ff4c] py-3 overflow-hidden flex whitespace-nowrap relative z-20 border-y-2 border-black">
-        <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
-          {[...Array(20)].map((_, i) => (
-            <span key={i} className="mx-8">SOMA</span>
-          ))}
-        </div>
-      </div>
+  <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
+    {/* Creamos un contenedor que se repetirá para llenar el ancho */}
+    <div className="flex items-center animate-scroll">
+      {[...Array(100)].map((_, i) => (
+        <React.Fragment key={i}>
+          {/* Logo Negro (Modo Claro) */}
+          <img 
+            src="/soma_logo.png" 
+            alt="SOMA" 
+            className="mx-8 h-8 object-contain block dark:hidden" 
+          />
+          {/* Logo Blanco (Modo Oscuro) */}
+          <img 
+            src="/soma_logo_blanco.png" 
+            alt="SOMA" 
+            className="mx-8 h-8 object-contain hidden dark:block" 
+          />
+        </React.Fragment>
+      ))}
+    </div>
+  </div>
+</div>
 
       {/* ==========================================
           SECCIÓN 2: GESTIÓN ALTAMENTE EFICIENTE (Oscura)
@@ -126,8 +143,10 @@ export default function Home() {
               y garantiza la seguridad
             </h2>
             
-            <button className="hidden lg:inline-flex mt-12 bg-[#8b5cf6] hover:bg-[#7c4dff] text-white px-8 py-4 rounded-xl text-sm font-bold tracking-widest items-center gap-3 transition-transform hover:-translate-y-1 shadow-xl">
+            
+           <button className="hidden lg:inline-flex mt-12 bg-[#8b5cf6] hover:bg-[#7c4dff] text-white px-8 py-4 rounded-xl text-sm font-bold tracking-widest items-center gap-3 transition-transform hover:-translate-y-1 shadow-xl">
               COMIENZA TU CONSULTA <ArrowUpRight size={20} />
+              
             </button>
           </div>
 
@@ -161,9 +180,9 @@ export default function Home() {
               Digitaliza tu consulta en 3 pasos
             </h2>
             <div className="text-white/30 text-2xl font-black tracking-widest flex items-center gap-2">
-               <img src="/soma_logo.png" alt="SOMA Logo" className="h-14 object-contain block dark:hidden transition-opacity duration-300" />
+               
                   {/* Modo Oscuro (Logo Blanco) */}
-                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-14 object-contain hidden dark:block transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-14 object-contain dark:block transition-opacity duration-300" />
             </div>
           </div>
 
@@ -263,15 +282,29 @@ export default function Home() {
       {/* ==========================================
           BARRA MARQUEE 2 (CON ASTERISCOS)
           ========================================== */}
-      <div className="bg-[#b0ff4c] py-3 overflow-hidden flex whitespace-nowrap relative z-20 border-y-2 border-black">
-        <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
-          {[...Array(20)].map((_, i) => (
-            <span key={i} className="mx-6 flex items-center gap-6">
-              SOMA <span className="text-4xl leading-none mt-2">*</span>
-            </span>
-          ))}
-        </div>
-      </div>
+   <div className="bg-[#b0ff4c] py-3 overflow-hidden flex whitespace-nowrap relative z-20 border-y-2 border-black">
+  <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
+    {/* Creamos un contenedor que se repetirá para llenar el ancho */}
+    <div className="flex items-center animate-scroll">
+      {[...Array(100)].map((_, i) => (
+        <React.Fragment key={i}>
+          {/* Logo Negro (Modo Claro) */}
+          <img 
+            src="/soma_logo.png" 
+            alt="SOMA" 
+            className="mx-8 h-8 object-contain block dark:hidden" 
+          />
+          {/* Logo Blanco (Modo Oscuro) */}
+          <img 
+            src="/soma_logo_blanco.png" 
+            alt="SOMA" 
+            className="mx-8 h-8 object-contain hidden dark:block" 
+          />
+        </React.Fragment>
+      ))}
+    </div>
+  </div>
+</div>
 
       {/* ==========================================
           SECCIÓN 6: CREADORES
