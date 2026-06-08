@@ -38,6 +38,7 @@ export default function Pacientes() {
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [pacientes, setPacientes] = useState([]);
+  const [consultasPaciente, setConsultasPaciente] = useState([]); // <-- Nuevo estado para contar consultas
   const [loadingPacientes, setLoadingPacientes] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -61,8 +62,7 @@ export default function Pacientes() {
   });
 
   const listaConsultorios = [
-    "A&J Medics", "CM Cristo Redentor", "CM San Francisco Centro", 
-    "CM San Luis", "Cardin", "Centro Medico Sisal", "Centro Médico Amisalud"
+    "Hospital Cardon"
   ];
 
   useEffect(() => {
@@ -87,6 +87,18 @@ export default function Pacientes() {
 
     if (dbPacientes && !pacError) setPacientes(dbPacientes);
     setLoadingPacientes(false);
+  };
+
+  // Cargar las consultas de un paciente específico para el "Dashboard del paciente"
+  const cargarConsultasPaciente = async (idPaciente) => {
+    const { data } = await supabase
+      .from('consultas')
+      .select('*')
+      .eq('id_paciente', idPaciente)
+      .order('fecha_consulta', { ascending: false });
+      
+    if (data) setConsultasPaciente(data);
+    else setConsultasPaciente([]);
   };
 
   useEffect(() => { fetchData(); }, [navigate]);
@@ -175,6 +187,7 @@ export default function Pacientes() {
 
       if (error) throw error;
       alert("¡Historia guardada con éxito!");
+      cargarConsultasPaciente(pacienteSeleccionado.id); // Actualizar los contadores al instante
       setHistoriaView('list');
     } catch (error) {
       alert("Error al guardar la historia. Verifica las columnas en Supabase.");
@@ -250,16 +263,12 @@ export default function Pacientes() {
       sexo: paciente.sexo, fecha_nacimiento: paciente.fecha_nacimiento, estado_civil: 'No especificado'
     });
     setPacienteSeleccionado(paciente);
+    cargarConsultasPaciente(paciente.id);
     setActiveTab('datos');
     setIsEditingData(false);
     setHistoriaView('list');
     setRecipeView('list');
     setInformeView('list');
-  };
-
-  const iniciarNuevaHistoria = () => {
-    setActiveTab('historias');
-    setHistoriaView('create');
   };
 
   const calcularEdad = (fechaNacimiento) => {
@@ -277,6 +286,17 @@ export default function Pacientes() {
     const [year, month, day] = fecha.split('-');
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     return `${day} ${meses[parseInt(month)-1]} ${year}`;
+  };
+
+  // Formato: "05 de Junio de 2026 a las 18:06"
+  const formatearFechaTextoCompleta = (fechaCompleta) => {
+    if (!fechaCompleta) return '';
+    const fecha = new Date(fechaCompleta);
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const horas = String(fecha.getHours()).padStart(2, '0');
+    const minutos = String(fecha.getMinutes()).padStart(2, '0');
+    return `${dia} de ${meses[fecha.getMonth()]} de ${fecha.getFullYear()} a las ${horas}:${minutos}`;
   };
 
   const handleWhatsApp = (telefono) => {
@@ -464,6 +484,39 @@ export default function Pacientes() {
                 {/* 1. DATOS TAB */}
                 {activeTab === 'datos' && (
                   <>
+                    {/* Dashboard del Paciente Header */}
+                    <div className="mb-6">
+                      <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard del Paciente</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Resumen y datos personales de {pacienteSeleccionado.nombres} {pacienteSeleccionado.apellidos}</p>
+                    </div>
+
+                    {/* Tarjetas de Resumen Dinámicas */}
+                    <div className="flex flex-col md:flex-row gap-6 mb-8">
+                      <div className="flex-1 bg-white dark:bg-[#111111] p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-5 transition-transform hover:-translate-y-1">
+                        <div className="w-12 h-12 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
+                          <FileText size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total de consultas</p>
+                          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{consultasPaciente.length}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 bg-white dark:bg-[#111111] p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-5 transition-transform hover:-translate-y-1">
+                        <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                          <Calendar size={24} />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Última consulta</p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white leading-none mt-1">
+                            {consultasPaciente.length > 0 
+                               ? formatearFechaTextoCompleta(consultasPaciente[0].fecha_consulta || consultasPaciente[0].created_at)
+                               : 'Sin consultas'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     {!isEditingData ? (
                       <div className="animate-[fadeIn_0.2s_ease-out] space-y-6">
                         <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">

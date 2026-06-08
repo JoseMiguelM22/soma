@@ -3,8 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, Settings, LogOut, 
-  Menu, Sun, Moon, UserPlus, FilePlus, CalendarPlus, Clock, PlayCircle, X, PanelLeft,
-  ArrowRight, Activity, DollarSign
+  Menu, Sun, Moon, UserPlus, FilePlus, CalendarPlus, Clock, PlayCircle, X, PanelLeft
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -18,7 +17,6 @@ export default function Dashboard() {
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [stats, setStats] = useState({ pacientes: 0, historias: 0 });
   const [saludo, setSaludo] = useState('Hola');
 
   // Aplicar Modo Oscuro al HTML
@@ -35,13 +33,12 @@ export default function Dashboard() {
     else setSaludo('¡Buenas noches');
   }, []);
 
-  // Cargar Sesión, Usuario y Estadísticas (Con protección anti-bugs de carga)
+  // Cargar Sesión y Usuario
   useEffect(() => {
     let isMounted = true;
 
-    const fetchAllData = async (session) => {
+    const fetchUser = async (session) => {
       try {
-        // 1. Datos del usuario
         const { data: dbUser } = await supabase
           .from('usuarios')
           .select('*')
@@ -49,46 +46,20 @@ export default function Dashboard() {
           .single();
 
         if (isMounted && dbUser) setUserData(dbUser);
-
-        // 2. Contar Pacientes
-        const { count: countPacientes } = await supabase
-          .from('pacientes')
-          .select('*', { count: 'exact', head: true })
-          .eq('id_medico', session.user.id);
-
-        // 3. Contar Historias (Consultas)
-        const { count: countHistorias } = await supabase
-          .from('consultas')
-          .select('*', { count: 'exact', head: true })
-          .eq('id_medico', session.user.id);
-
-        if (isMounted) {
-          setStats({
-            pacientes: countPacientes || 0,
-            historias: countHistorias || 0
-          });
-          setLoadingUser(false);
-        }
-
+        if (isMounted) setLoadingUser(false);
       } catch (error) {
-        console.error("Error cargando datos:", error);
         if (isMounted) setLoadingUser(false);
       }
     };
 
-    // Verificar sesión inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate('/login');
-      } else {
-        fetchAllData(session);
-      }
+      if (!session) navigate('/login');
+      else fetchUser(session);
     });
 
-    // Escuchar cambios de sesión (ESTO ARREGLA EL BUG DE TENER QUE RECARGAR)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) navigate('/login');
-      else fetchAllData(session);
+      else fetchUser(session);
     });
 
     return () => {
@@ -98,8 +69,8 @@ export default function Dashboard() {
   }, [navigate]);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) navigate('/login');
+    await supabase.auth.signOut();
+    navigate('/login');
   };
 
   const getInitials = () => {
@@ -107,7 +78,7 @@ export default function Dashboard() {
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
 
-  // Si está cargando por primera vez, mostramos un spinner bonito a pantalla completa
+  // Pantalla de Carga
   if (loadingUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0a]">
@@ -120,71 +91,110 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
+  <div className="flex h-screen bg-slate-100 dark:bg-[#090a0f] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
       {/* OVERLAY PARA MÓVIL */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* ================= SIDEBAR ================= */}
-      <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#111111] border-r border-slate-200 dark:border-white/5 flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 w-64 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}>
+      {/* ================= SIDEBAR FLOTANTE Y REDONDEADO ================= */}
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 
+          bg-white dark:bg-[#16161a] 
+          border-r border-slate-200/80 dark:border-white/[0.04] 
+          flex flex-col justify-between 
+          transform transition-all duration-300 ease-in-out 
+          md:relative md:translate-x-0
+          md:m-4 md:mr-0 md:rounded-3xl 
+          shadow-xl shadow-slate-200/50 dark:shadow-none
+          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
+          ${isCollapsed ? 'md:w-24' : 'md:w-68'}
+        `}>
         <div>
-          <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-widest overflow-hidden whitespace-nowrap">
-              <span className="text-cyan-600 dark:text-cyan-400 text-2xl">*</span>
-              {!isCollapsed && <span>SOMA</span>}
-            </h1>
-            {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
+          {/* Logo SOMA Dinámico */}
+          <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
+            <Link to="/dashboard" className="flex items-center overflow-hidden whitespace-nowrap">
+              {isCollapsed ? (
+                <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
+              ) : (
+                <>
+                  {/* Modo Claro (Logo Negro) */}
+                  <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  {/* Modo Oscuro (Logo Blanco) */}
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
+                </>
+              )}
+            </Link>
+            {!isCollapsed && (
+              <button className="md:hidden text-slate-400 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
-          <div className={`py-6 ${isCollapsed ? 'px-2' : 'px-4'}`}>
-            {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest">HERRAMIENTAS</p>}
-            <nav className="space-y-2">
-              <Link to="/dashboard" className={`flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Home size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Inicio</span>}
+          {/* Menú: Herramientas */}
+          <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
+            <nav className="space-y-1.5">
+              <Link to="/dashboard" className={`flex items-center gap-3 py-3 bg-emerald-500/10 dark:bg-white/10 text-emerald-600 dark:text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Home size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
               </Link>
-              <Link to="/pacientes" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Users size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Pacientes</span>}
+              <Link to="/pacientes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Users size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Pacientes</span>}
               </Link>
-              <Link to="/historias" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <FileText size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Historias Clínicas</span>}
+              <Link to="/historias" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <FileText size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Historias Clínicas</span>}
               </Link>
-              <Link to="/agenda" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Calendar size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Agenda</span>}
+              <Link to="/agenda" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Calendar size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
+              </Link>
+               <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Calendar size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadisticas</span>}
               </Link>
             </nav>
           </div>
 
-          <div className={isCollapsed ? 'px-2' : 'px-4'}>
-            {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest mt-4">CONFIGURACIÓN</p>}
-            <nav className="space-y-2">
-              <Link to="/perfil" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <User size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Mi perfil</span>}
+          {/* Menú: Configuración */}
+          <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
+            <nav className="space-y-1.5">
+              <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <User size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
               </Link>
-              <Link to="/ajustes" className={`flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-                <Settings size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Ajustes</span>}
+              <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Settings size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
               </Link>
             </nav>
           </div>
         </div>
 
-        <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
-          <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white">
+        {/* Footer del Sidebar */}
+        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+          <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-white/20">
               {getInitials()}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">Médico</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Médico</p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData?.nombres} {userData?.apellidos}
+                  {userData?.nombres || 'Miguel'} {userData?.apellidos || 'Gómez'}
                 </p>
               </div>
             )}
           </div>
-          <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-            <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-400 dark:text-slate-500 hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+            <LogOut size={18} className="shrink-0" />
+            {!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}
           </button>
         </div>
       </aside>
@@ -193,164 +203,110 @@ export default function Dashboard() {
       <main className="flex-1 flex flex-col h-screen overflow-y-auto w-full relative">
         
         {/* Header Superior */}
-        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-transparent backdrop-blur-sm sticky top-0 z-30">
+        <header className="h-20 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200/60 dark:border-white/[0.04] bg-white/40 dark:bg-transparent backdrop-blur-md sticky top-0 z-30">
           <div className="flex items-center gap-4">
-            <button className="text-slate-500 hover:text-cyan-600 md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></button>
-            <button className="hidden md:flex p-2 text-slate-400 hover:text-cyan-600 rounded-xl bg-slate-100 dark:bg-white/5" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={20} /></button>
+            <button className="text-slate-500 dark:text-slate-400 hover:text-blue-600 md:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={22} />
+            </button>
+            <button className="hidden md:flex p-2.5 text-slate-400 hover:text-white rounded-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] shadow-sm" onClick={() => setIsCollapsed(!isCollapsed)}>
+              <PanelLeft size={18} />
+            </button>
           </div>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 text-slate-400 hover:text-yellow-400 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-amber-500 dark:hover:text-yellow-400 rounded-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] shadow-sm transition-all">
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </header>
 
-        {/* CONTENEDOR DASHBOARD */}
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        {/* CONTENEDOR INTERNO DEL DASHBOARD */}
+        <div className="p-6 sm:p-8 max-w-[1400px] mx-auto w-full space-y-10">
           
-          {/* Bienvenida y Badge */}
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-8 gap-4">
+          {/* Bienvenida */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
             <div>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
-                {saludo}, Dr. {userData?.apellidos}!
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                {saludo} Dr. {userData?.apellidos || 'Gómez'}!
               </h2>
-              <p className="text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 text-sm sm:text-base">
-                Aquí tienes un resumen de tu actividad en SOMA.
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 text-amber-700 dark:text-amber-500 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 w-fit">
-              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
-              Plan Gratuito Activo
             </div>
           </div>
 
-          {/* ================= GRADAS DE ESTADÍSTICAS TIPO GALÉNICOS ================= */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-10">
-            
-            {/* Tarjeta 1: Pacientes */}
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-50 dark:bg-blue-900/20 rounded-full transition-transform group-hover:scale-110"></div>
-              <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1 relative z-10">Total pacientes <span className="text-xs font-normal text-slate-400">(General)</span></p>
-              <h3 className="text-4xl font-black text-slate-900 dark:text-white mb-4 relative z-10">{stats.pacientes}</h3>
-              <div className="flex justify-between items-end relative z-10">
-                <Link to="/pacientes" className="text-blue-600 dark:text-blue-400 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all">
-                  Ver pacientes <ArrowRight size={14} />
-                </Link>
-                <Users size={24} className="text-blue-200 dark:text-blue-900/50" />
-              </div>
-            </div>
-
-            {/* Tarjeta 2: Historias */}
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-50 dark:bg-purple-900/20 rounded-full transition-transform group-hover:scale-110"></div>
-              <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1 relative z-10">Historias creadas <span className="text-xs font-normal text-slate-400">(General)</span></p>
-              <h3 className="text-4xl font-black text-slate-900 dark:text-white mb-4 relative z-10">{stats.historias}</h3>
-              <div className="flex justify-between items-end relative z-10">
-                <Link to="/historias" className="text-purple-600 dark:text-purple-400 text-sm font-bold flex items-center gap-1 hover:gap-2 transition-all">
-                  Ver historias <ArrowRight size={14} />
-                </Link>
-                <FileText size={24} className="text-purple-200 dark:text-purple-900/50" />
-              </div>
-            </div>
-
-            {/* Tarjeta 3: Ingresos (Simulada para mantener el diseño) */}
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 p-6 rounded-2xl shadow-sm relative overflow-hidden group">
-              <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-50 dark:bg-emerald-900/20 rounded-full transition-transform group-hover:scale-110"></div>
-              <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-1 relative z-10">Ingresos facturados <span className="text-xs font-normal text-slate-400">últimos 7 días</span></p>
-              <h3 className="text-4xl font-black text-slate-900 dark:text-white mb-4 relative z-10">$0,00</h3>
-              <div className="flex justify-between items-end relative z-10">
-                <span className="text-emerald-600 dark:text-emerald-400 text-sm font-bold flex items-center gap-1 cursor-not-allowed opacity-70">
-                  Ver facturas <ArrowRight size={14} />
-                </span>
-                <DollarSign size={24} className="text-emerald-200 dark:text-emerald-900/50" />
-              </div>
-            </div>
-
-          </div>
-
-          {/* ================= ACCIONES RÁPIDAS (Tus botones coloridos) ================= */}
-          <div className="mb-10">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Acciones Rápidas</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          {/* ================= BOTONES DE ACCIONES RÁPIDAS (ESTILO BLOQUE 3x1) ================= */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              <Link to="/pacientes" className="flex items-center justify-center sm:justify-start px-6 py-4 gap-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-base transition-all transform hover:-translate-y-1 shadow-lg shadow-blue-500/20">
-                <UserPlus size={22} className="shrink-0" />
-                <span>Crear Paciente</span>
+              <Link to="/pacientes" className="flex items-center justify-center gap-3 p-8 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[2rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+                <UserPlus size={28} />
+                <span className="text-xl">Crear Paciente</span>
               </Link>
               
-              <Link to="/historias" className="flex items-center justify-center sm:justify-start px-6 py-4 gap-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-base transition-all transform hover:-translate-y-1 shadow-lg shadow-emerald-500/20">
-                <FilePlus size={22} className="shrink-0" />
-                <span>Crear Consulta</span>
+              <Link to="/historias" className="flex items-center justify-center gap-3 p-8 bg-[#10b981] hover:bg-[#059669] text-white rounded-[2rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+                <FilePlus size={28} />
+                <span className="text-xl">Crear Consulta</span>
               </Link>
               
-              <Link to="/agenda" className="flex items-center justify-center sm:justify-start px-6 py-4 gap-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-bold text-base transition-all transform hover:-translate-y-1 shadow-lg shadow-violet-500/20">
-                <CalendarPlus size={22} className="shrink-0" />
-                <span>Agendar Cita</span>
+              <Link to="/agenda" className="flex items-center justify-center gap-3 p-8 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[2rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+                <CalendarPlus size={28} />
+                <span className="text-xl">Agendar Cita</span>
               </Link>
+
+              
 
             </div>
           </div>
 
-          {/* ================= GRILLA INFERIOR (Citas y Video) ================= */}
+          {/* ================= BLOQUES INFERIORES ================= */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Widget: Citas de Hoy */}
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 rounded-2xl p-6 flex flex-col shadow-sm h-[350px]">
-              <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/5 pb-4 shrink-0">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                  <Clock size={18} className="text-slate-400" /> Citas de Hoy
+            {/* Componente Citas de Hoy */}
+            <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px]">
+              <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
+                <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+                  <Clock size={20} className="text-slate-400" /> Citas de Hoy
                 </h3>
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-full">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                   0 citas
                 </span>
               </div>
               
-              <div className="flex-1 flex flex-col items-center justify-center text-center">
-                <Calendar size={56} className="text-slate-200 dark:text-slate-700 mb-4" strokeWidth={1} />
-                <p className="text-slate-800 dark:text-white font-bold mb-1">Sin citas pendientes hoy</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-xs">
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                <Calendar size={56} className="text-slate-300 dark:text-white/20 mb-4" strokeWidth={1.5} />
+                <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Sin citas pendientes hoy</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm leading-relaxed">
                   Puedes agendar una nueva cita desde el calendario.
                 </p>
-                <Link to="/agenda" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-md shadow-blue-500/20">
+                <Link to="/agenda" className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white px-8 py-3 rounded-full font-bold text-sm transition-all shadow-md shadow-purple-500/20">
                   Ir a la Agenda
                 </Link>
               </div>
             </div>
 
-            {/* Widget: Guía Rápida (Simulando un Video de YouTube) */}
-            <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/5 rounded-2xl p-6 flex flex-col shadow-sm h-[350px]">
+            {/* Componente Guía Rápida */}
+            <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px]">
               <div className="mb-4 shrink-0">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white mb-2">
-                  <PlayCircle size={18} className="text-rose-500" /> Guía rápida de SOMA
+                <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white mb-2">
+                  <PlayCircle size={20} className="text-rose-500" /> Guía rápida de SOMA
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                   Familiarízate con tu nuevo entorno de trabajo. Configura tu consultorio, registra pacientes y potencia tus consultas médicas en pocos pasos.
                 </p>
               </div>
               
-              {/* Contenedor tipo "Video Thumbnail" */}
-              <div className="flex-1 mt-2 relative rounded-xl overflow-hidden group cursor-pointer border border-slate-200 dark:border-slate-700 bg-slate-800 flex items-center justify-center">
+              {/* Mock de Miniatura de Video */}
+              <div className="flex-1 relative rounded-2xl overflow-hidden group cursor-pointer border border-slate-200 dark:border-slate-800 bg-[#101216] flex items-center justify-center shadow-inner mt-2">
+                <div className="absolute inset-0 opacity-20 bg-gradient-to-br from-emerald-500 to-cyan-500 group-hover:opacity-30 transition-opacity" />
                 
-                {/* Imagen de fondo difuminada para simular el video */}
-                <div className="absolute inset-0 opacity-40 bg-gradient-to-br from-cyan-900 to-slate-900"></div>
-                
-                {/* Textos sobre el video falso */}
                 <div className="absolute top-4 left-4 right-4 z-10 flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-white font-bold text-xs shrink-0">S</div>
-                  <p className="text-white text-sm font-bold leading-tight drop-shadow-md">
-                    03. ¿Cómo crear una historia clínica digital? | Software Médico para consultorios
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow">S</div>
+                  <p className="text-white text-sm font-bold leading-tight drop-shadow mt-1">
+                    Crea tus Historias Clínicas. Fácil y Rápido.
                   </p>
                 </div>
 
-                {/* Botón de Play Rojo */}
-                <div className="relative z-20 w-16 h-11 bg-red-600 rounded-xl flex items-center justify-center group-hover:bg-red-500 transition-colors shadow-lg">
+                <div className="relative z-20 w-16 h-12 bg-rose-600 rounded-2xl flex items-center justify-center group-hover:bg-rose-500 transition-colors shadow-lg">
                   <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                 </div>
 
-                {/* Barra inferior del video */}
-                <div className="absolute bottom-4 right-4 z-10">
-                  <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full font-medium backdrop-blur-sm flex items-center gap-1.5 hover:bg-black/90 transition-colors">
-                    Mirar en <span className="font-bold">YouTube</span>
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -358,13 +314,12 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Estilos para animaciones */}
       <style>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
+          from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        main > div { animation: fadeIn 0.4s ease-out; }
+        main > div { animation: fadeIn 0.35s ease-out; }
       `}</style>
     </div>
   );

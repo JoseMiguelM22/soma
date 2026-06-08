@@ -208,11 +208,25 @@ export default function Agendas() {
       )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#111111] border-r border-slate-200 dark:border-white/5 flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 w-64 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}>
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 
+          bg-white dark:bg-[#16161a] 
+          border-r border-slate-200/80 dark:border-white/[0.04] 
+          flex flex-col justify-between 
+          transform transition-all duration-300 ease-in-out 
+          md:relative md:translate-x-0
+          md:m-4 md:mr-0 md:rounded-3xl 
+          shadow-xl shadow-slate-200/50 dark:shadow-none
+          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
+          ${isCollapsed ? 'md:w-24' : 'md:w-68'}
+        `}>
         <div>
           <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
             <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-widest overflow-hidden whitespace-nowrap">
-              <span className="text-cyan-600 dark:text-cyan-400 text-2xl">*</span>{!isCollapsed && <span>SOMA</span>}
+              <span className="text-cyan-600 dark:text-cyan-400 text-2xl"></span>{!isCollapsed && <span></span>}
+              <img src="/soma_logo.png" alt="SOMA" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
             </h1>
             {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
           </div>
@@ -227,6 +241,10 @@ export default function Agendas() {
             </nav>
           </div>
         </div>
+
+        
+
+        
 
         <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>

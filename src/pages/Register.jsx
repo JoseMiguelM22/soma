@@ -61,19 +61,18 @@ export default function Register() {
     // 1. Validar Nombre y Apellido (Solo letras y espacios)
     if (name === 'primer_nombre' || name === 'primer_apellido') {
       const regexSoloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]*$/;
-      if (!regexSoloLetras.test(value)) return; // Ignora el cambio si hay números o símbolos
+      if (!regexSoloLetras.test(value)) return;
     }
 
     // 2. Validar Documento y Teléfono (SÓLO NÚMEROS)
     if (name === 'numero_identificacion' || name === 'telefono') {
       const regexSoloNumeros = /^[0-9]*$/;
-      if (!regexSoloNumeros.test(value)) return; // Ignora el cambio si meten letras
+      if (!regexSoloNumeros.test(value)) return;
     }
 
     // 3. Validar Correo Electrónico (Máx 30 chars, solo formato válido)
     if (name === 'correo') {
-      if (value.length > 30) return; // Bloquea si pasa de 25 caracteres
-      // Permite letras, números, puntos, @, y guiones. Nada de espacios ni caracteres raros
+      if (value.length > 30) return;
       const regexCorreo = /^[a-zA-Z0-9.@_-]*$/;
       if (!regexCorreo.test(value)) return;
     }
@@ -144,210 +143,334 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 py-12 bg-gradient-to-br from-blue-700 via-cyan-600 to-teal-500 dark:from-slate-900 dark:via-[#0a192f] dark:to-[#082f3a] transition-colors duration-500 font-sans relative overflow-y-auto">
+    <div 
+      className="min-h-screen bg-[#050816] overflow-y-auto" 
+      style={{ fontFamily: "'Nunito', sans-serif" }}
+    >
       
       {/* Cargador Central */}
-      <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-white dark:bg-[#0f172a] transition-opacity duration-500 ${showMainLoader ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="relative flex items-center justify-center">
-          <div className="w-20 h-20 border-4 border-cyan-100 dark:border-slate-800 border-t-cyan-500 rounded-full animate-spin"></div>
-          <div className="absolute w-12 h-12 bg-cyan-600 rounded-2xl flex items-center justify-center animate-pulse">
-            <Activity className="h-6 w-6 text-white" />
-          </div>
-        </div>
-      </div>
-
-      <div className="fixed top-0 left-0 h-[3px] bg-white z-[10000] transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ width: `${loaderWidth}%`, opacity: showMainLoader ? 1 : 0 }}></div>
-
-      {/* Alertas Toast */}
-      {alert.show && (
-        <div className="fixed top-4 inset-x-0 flex justify-center px-6 z-50 animate-[slideDownFade_0.4s_ease-out]">
-          <div className={`bg-white dark:bg-slate-800 text-slate-900 dark:text-white border ${alert.type === 'error' ? 'border-red-500' : 'border-green-500'} rounded-xl shadow-2xl px-5 py-4 w-80 max-w-full flex items-start space-x-3`}>
-            {alert.type === 'error' ? <XCircle className="text-red-500 shrink-0 text-xl" /> : <CheckCircle className="text-green-500 shrink-0 text-xl" />}
-            <div className="flex-1">
-              <h3 className="font-bold text-sm">{alert.type === 'error' ? 'Error' : 'Éxito'}</h3>
-              <p className="text-xs mt-1 text-slate-600 dark:text-slate-300">{alert.message}</p>
+      {showMainLoader && (
+        <div className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#050816] transition-opacity duration-500`}>
+          <div className="relative flex items-center justify-center">
+            <div className="w-20 h-20 border-4 border-white/10 border-t-[#8B5CF6] rounded-full animate-spin"></div>
+            <div className="absolute w-12 h-12 bg-[#8B5CF6] rounded-2xl flex items-center justify-center animate-pulse">
+              <Activity className="h-6 w-6 text-white" />
             </div>
-            <button onClick={() => setAlert({ show: false })} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
           </div>
         </div>
       )}
 
-      {/* TARJETA CENTRAL DE REGISTRO */}
-      <div className="w-full max-w-[600px] bg-white dark:bg-[#111111] rounded-[2rem] shadow-2xl p-8 sm:p-10 relative z-10 animate-[fadeIn_0.5s_ease-out]">
-        
-        {/* Cabecera / Logo */}
-        <div className="text-center mb-6">
-          <Link to="/" className="inline-block text-3xl font-bold transition-colors text-cyan-600 dark:text-cyan-400">
-            <span className="font-normal">SOMA</span>
-            <span className="font-black">Cloud</span>
-          </Link>
-          <div className="flex items-center justify-center gap-2 mt-3 text-[10px] font-bold text-slate-400 tracking-[0.2em]">
-            <div className="h-px w-8 bg-slate-200 dark:bg-slate-700"></div>
-            CUENTA Y ACCESO
-            <div className="h-px w-8 bg-slate-200 dark:bg-slate-700"></div>
-          </div>
-        </div>
+      <div className="fixed top-0 left-0 h-[3px] bg-white z-[10000] transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ width: `${loaderWidth}%`, opacity: showMainLoader ? 1 : 0 }}></div>
 
-        {/* Textos Principales */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white">
-            Crea tu cuenta médica
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Prueba gratuita. Solo los datos necesarios para activar tu consultorio.
-          </p>
-        </div>
-
-        {/* Formulario */}
-        <form onSubmit={handleRegister} className="space-y-4">
-          
-          {/* Especialidad (Full Width) */}
-          <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Especialidad</label>
-            <select name="especialidad" value={formData.especialidad} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium">
-              <option value="" className="text-slate-400">Seleccionar especialidad...</option>
-              {especialidades.map(esp => <option key={esp} value={esp} className="text-slate-900">{esp}</option>)}
-            </select>
-          </div>
-
-          {/* Nombre y Apellido */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Nombre</label>
-              <input type="text" name="primer_nombre" maxLength="18" value={formData.primer_nombre} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600" placeholder="Ej. José" />
-            </div>
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Apellido</label>
-              <input type="text" name="primer_apellido" maxLength="18" value={formData.primer_apellido} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600" placeholder="Ej. Medina" />
-            </div>
-          </div>
-
-          {/* Cédula y Teléfono */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Documento de Identidad</label>
-              <input type="text" name="numero_identificacion" maxLength="12" value={formData.numero_identificacion} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600" placeholder="12345678" />
-            </div>
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all flex flex-col justify-center">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Teléfono</label>
-              <div className="flex items-center">
-                <img className="w-4 h-[11px] object-cover mr-2 rounded-sm" src="https://flagcdn.com/w20/ve.png" alt="VE" />
-                <span className="text-sm font-medium text-slate-500 dark:text-slate-400 mr-2">+58</span>
-                <input type="text" name="telefono" maxLength="11" value={formData.telefono} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600" placeholder="4121234567" />
-              </div>
-            </div>
-          </div>
-
-          {/* Correo Electrónico (Full Width) - Max 30 chars */}
-          <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Correo Electrónico</label>
-            <input type="text" name="correo" maxLength="30" value={formData.correo} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600" placeholder="tu@correo.com" />
-          </div>
-
-          {/* Contraseñas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all relative">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Contraseña (Mín. 6)</label>
-              <input 
-                type={showPassword ? "text" : "password"} 
-                name="contrasena" 
-                minLength={6}
-                maxLength={20}
-                value={formData.contrasena} 
-                onChange={handleChange} 
-                required 
-                className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600 pr-8" 
-                placeholder="••••••••" 
-              />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-500 mt-2">
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all relative">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Confirmar Contraseña</label>
-              <input 
-                type={showConfirmPassword ? "text" : "password"} 
-                name="confirmar_contrasena" 
-                minLength={6}
-                maxLength={20}
-                value={formData.confirmar_contrasena} 
-                onChange={handleChange} 
-                required 
-                className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium placeholder-slate-300 dark:placeholder-slate-600 pr-8" 
-                placeholder="••••••••" 
-              />
-              <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-cyan-500 mt-2">
-                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {/* Sexo y País */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Sexo</label>
-              <select name="sexo" value={formData.sexo} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium">
-                <option value="" className="text-slate-400">Seleccionar...</option>
-                <option value="Masculino" className="text-slate-900">Masculino</option>
-                <option value="Femenino" className="text-slate-900">Femenino</option>
-                <option value="Otro" className="text-slate-900">Otro</option>
-              </select>
-            </div>
-            <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-slate-100 dark:bg-slate-800 transition-all cursor-not-allowed">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">País</label>
-              <select name="pais" disabled className="w-full bg-transparent outline-none text-slate-500 dark:text-slate-400 text-sm font-medium cursor-not-allowed">
-                <option value="Venezuela">Venezuela</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Ciudad (Full Width) */}
-          <div className="border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-2.5 bg-white dark:bg-[#1a1a1a] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition-all mb-8">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Ciudad</label>
-            <select name="ciudad" value={formData.ciudad} onChange={handleChange} required className="w-full bg-transparent outline-none text-slate-900 dark:text-white text-sm font-medium">
-              <option value="" className="text-slate-400">Seleccione una ciudad</option>
-              {cities.map(c => <option key={c} value={c} className="text-slate-900">{c}</option>)}
-            </select>
-          </div>
-
-          {/* Botón Principal */}
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full mt-6 bg-[#0081a7] hover:bg-[#006a8a] dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white py-3.5 rounded-xl font-bold text-sm transition-all transform hover:-translate-y-0.5 shadow-lg shadow-cyan-900/20 disabled:opacity-50 disabled:transform-none flex justify-center items-center gap-2"
+      {/* ALERTAS */}
+      {alert.show && (
+        <div className="fixed top-5 left-0 right-0 flex justify-center z-50 animate-[slideDownFade_0.4s_ease-out]">
+          <div
+            className={`px-5 py-3 rounded-xl shadow-lg text-white text-sm font-bold tracking-wide ${
+              alert.type === "success" ? "bg-green-500" : "bg-red-500"
+            }`}
           >
-            {loading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Creando cuenta...</> : 'Crear cuenta'}
-          </button>
-        </form>
+            {alert.message}
+          </div>
+        </div>
+      )}
 
-        {/* Footer de la tarjeta */}
-        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5 flex flex-col items-center space-y-4">
-          <Link to="/login" className="text-sm font-bold text-[#0081a7] dark:text-cyan-400 hover:underline transition-all">
-            Iniciar sesión
-          </Link>
-          <button className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
-            Reenviar correo de confirmación
-          </button>
-          <Link to="/" className="text-xs font-medium text-slate-400 dark:text-slate-500 flex items-center gap-1.5 hover:text-slate-800 dark:hover:text-white transition-colors group mt-2">
-            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Volver al inicio
-          </Link>
+      {/* Contenedor principal ensanchado a 1536px para permitir mayor separación */}
+      <div className="max-w-[1536px] mx-auto min-h-screen px-8 lg:px-16 py-12 flex items-center justify-center">
+
+        {/* Uso de Flexbox con justify-between para empujar los paneles a los extremos */}
+        <div className="flex flex-col lg:flex-row items-center justify-between w-full gap-12 lg:gap-20 xl:gap-32">
+
+          {/* PANEL IZQUIERDO OPTIMIZADO */}
+          <div className="hidden lg:flex justify-start items-center w-full lg:w-1/2 h-full">
+
+            <div className="relative">
+
+              <img
+                src="/soma_logo.png"
+                alt="SOMA"
+                className="absolute top-10 left-10 h-8 z-20"
+              />
+
+              <div
+                className="
+                w-[600px]
+                h-[840px]
+                rounded-[44px]
+                overflow-hidden
+                relative
+                border
+                border-white/10
+                shadow-2xl
+                "
+              >
+                {/* Fondo */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#D8FFF4] via-[#9BF3DB] to-[#17C79A]" />
+
+                {/* Blur grande */}
+                <div className="absolute left-[-50px] top-[180px] w-[400px] h-[400px] rounded-full bg-white/40 blur-[130px]" />
+
+                {/* Blur lateral */}
+                <div className="absolute right-[-60px] top-[80px] w-[340px] h-[340px] rounded-full bg-[#00FFB3]/20 blur-[120px]" />
+
+                {/* Blur inferior */}
+                <div className="absolute bottom-[-60px] left-[160px] w-[300px] h-[300px] rounded-full bg-white/20 blur-[100px]" />
+
+                {/* Textura */}
+                <div className="absolute inset-0 opacity-[0.05] bg-[radial-gradient(circle,black_1px,transparent_1px)] bg-[length:8px_8px]" />
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* FORMULARIO DE REGISTRO */}
+          {/* Alineado hacia la derecha */}
+          <div className="w-full lg:w-1/2 flex justify-end items-center">
+            {/* max-w-[480px] para dar espacio a los inputs dobles (ej. Nombre y Apellido) */}
+            <div className="w-full max-w-[480px]">
+
+              {/* Logo móvil */}
+              <div className="lg:hidden flex justify-center mb-8">
+                <img src="/soma_logo.png" alt="SOMA Logo" className="h-12 object-contain block dark:hidden transition-opacity duration-300" />
+                <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-12 object-contain hidden dark:block transition-opacity duration-300" />
+              </div>
+
+              {/* Logo escritorio */}
+              <div className="hidden lg:block text-center">
+                <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain block dark:hidden transition-opacity duration-300" />
+                <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain hidden dark:block transition-opacity duration-300" />
+              </div>
+
+              <div className="text-center mb-8">
+                <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">
+                  Crea tu cuenta médica
+                </h1>
+                <p className="text-[#A1A1AA] text-sm font-semibold leading-relaxed max-w-[360px] mx-auto">
+                  Prueba gratuita. Solo los datos necesarios para activar tu consultorio.
+                </p>
+              </div>
+
+              <form onSubmit={handleRegister} className="space-y-4">
+                
+                {/* Especialidad */}
+                <div>
+                  <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
+                    Especialidad
+                  </label>
+                  <select 
+                    name="especialidad" 
+                    value={formData.especialidad} 
+                    onChange={handleChange} 
+                    required 
+                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300"
+                  >
+                    <option value="" className="text-gray-400">Seleccionar especialidad...</option>
+                    {especialidades.map(esp => <option key={esp} value={esp} className="text-gray-900">{esp}</option>)}
+                  </select>
+                </div>
+
+                {/* Nombre y Apellido */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Nombre</label>
+                    <input 
+                      type="text" 
+                      name="primer_nombre" 
+                      maxLength="18" 
+                      value={formData.primer_nombre} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      placeholder="Ej. José" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Apellido</label>
+                    <input 
+                      type="text" 
+                      name="primer_apellido" 
+                      maxLength="18" 
+                      value={formData.primer_apellido} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      placeholder="Ej. Medina" 
+                    />
+                  </div>
+                </div>
+
+                {/* Cédula y Teléfono */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Documento de Identidad</label>
+                    <input 
+                      type="text" 
+                      name="numero_identificacion" 
+                      maxLength="12" 
+                      value={formData.numero_identificacion} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      placeholder="12345678" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Teléfono</label>
+                    <div className="flex items-center w-full py-3 px-4 rounded-xl bg-white border border-transparent focus-within:border-[#8B5CF6] focus-within:ring-2 focus-within:ring-[#8B5CF6]/30 transition-all duration-300">
+                      <img className="w-4 h-[11px] object-cover mr-2 rounded-sm" src="https://flagcdn.com/w20/ve.png" alt="VE" />
+                      <span className="text-sm font-bold text-gray-500 mr-2">+58</span>
+                      <input 
+                        type="text" 
+                        name="telefono" 
+                        maxLength="11" 
+                        value={formData.telefono} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full bg-transparent outline-none text-gray-900 text-sm font-semibold placeholder:text-gray-400" 
+                        placeholder="4121234567" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Correo Electrónico */}
+                <div>
+                  <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Correo Electrónico</label>
+                  <input 
+                    type="email" 
+                    name="correo" 
+                    maxLength="30" 
+                    value={formData.correo} 
+                    onChange={handleChange} 
+                    required 
+                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                    placeholder="tu@correo.com" 
+                  />
+                </div>
+
+                {/* Contraseñas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Contraseña (Mín. 6)</label>
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      name="contrasena" 
+                      minLength={6}
+                      maxLength={20}
+                      value={formData.contrasena} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      placeholder="••••••••" 
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-[36px] text-gray-400 hover:text-gray-700 transition-colors">
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Confirmar Contraseña</label>
+                    <input 
+                      type={showConfirmPassword ? "text" : "password"} 
+                      name="confirmar_contrasena" 
+                      minLength={6}
+                      maxLength={20}
+                      value={formData.confirmar_contrasena} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      placeholder="••••••••" 
+                    />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-[36px] text-gray-400 hover:text-gray-700 transition-colors">
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sexo y País */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Sexo</label>
+                    <select 
+                      name="sexo" 
+                      value={formData.sexo} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300"
+                    >
+                      <option value="" className="text-gray-400">Seleccionar...</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Femenino">Femenino</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-gray-400 text-sm font-bold mb-2 tracking-wide">País</label>
+                    <select 
+                      name="pais" 
+                      disabled 
+                      className="w-full py-3 px-4 rounded-xl bg-white/10 text-sm font-semibold text-gray-400 outline-none border border-white/5 cursor-not-allowed"
+                    >
+                      <option value="Venezuela">Venezuela</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Ciudad */}
+                <div>
+                  <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Ciudad</label>
+                  <select 
+                    name="ciudad" 
+                    value={formData.ciudad} 
+                    onChange={handleChange} 
+                    required 
+                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300 mb-2"
+                  >
+                    <option value="" className="text-gray-400">Seleccione una ciudad</option>
+                    {cities.map(c => <option key={c} value={c} className="text-gray-900">{c}</option>)}
+                  </select>
+                </div>
+
+                {/* Botón Principal */}
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full py-3 mt-6 rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-extrabold tracking-wide shadow-lg shadow-[#8B5CF6]/20 transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none flex justify-center items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 
+                      Procesando...
+                    </>
+                  ) : 'Crear cuenta'}
+                </button>
+              </form>
+
+              {/* Footer de la tarjeta */}
+              <div className="mt-8 pt-6 border-t border-white/10 flex flex-col items-center space-y-4">
+                <p className="text-[#A1A1AA] text-sm font-semibold">
+                  ¿Ya tienes cuenta?
+                  <Link to="/login" className="text-[#8B5CF6] ml-2 font-extrabold hover:text-[#A78BFA] transition-colors">
+                    Iniciar sesión
+                  </Link>
+                </p>
+                <Link to="/" className="text-xs font-bold text-slate-500 flex items-center gap-1.5 hover:text-white transition-colors group mt-2">
+                  <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Volver al inicio
+                </Link>
+              </div>
+
+            </div>
+          </div>
+
         </div>
 
       </div>
-
-      {/* Copyright flotante */}
-      <p className="mt-8 text-[10px] text-white/50 relative z-10 uppercase tracking-widest font-medium">
-        © {new Date().getFullYear()} SOMA Cloud
-      </p>
 
       <style>{`
         @keyframes slideDownFade {
           0% { opacity: 0; transform: translateY(-20px); }
           100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          0% { opacity: 0; transform: scale(0.95); }
-          100% { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>

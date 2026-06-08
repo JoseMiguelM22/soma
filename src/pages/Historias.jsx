@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, Settings, LogOut, 
   Menu, Sun, Moon, Plus, Search, X, PanelLeft, ClipboardList, 
-  Activity, Check, Maximize, FileSignature, AlignLeft, Bold, Italic, 
-  Underline, Strikethrough, List, ListOrdered, Type, Eye, Filter, ArrowLeft, Edit3
+  Check, Maximize, FileSignature, AlignLeft, Bold, Italic, 
+  Underline, Strikethrough, List, ListOrdered, Eye, Filter, ArrowLeft, Edit3,
+  Mic, MessageSquare, Undo, Redo, Paintbrush, ChevronDown, AlignCenter, AlignRight, AlignJustify, Link as LinkIcon, Image as ImageIcon, Zap, Type
 } from 'lucide-react';
+import { jsPDF } from "jspdf";
 
 export default function Historias() {
   const navigate = useNavigate();
@@ -15,6 +17,7 @@ export default function Historias() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isListening, setIsListening] = useState(false); 
   
   // ================= MODALES Y VISTAS =================
   const [isModalConsultaOpen, setIsModalConsultaOpen] = useState(false); 
@@ -22,14 +25,15 @@ export default function Historias() {
   
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
-  const [consultas, setConsultas] = useState([]); // Todas las consultas crudas
-  const [historiasAgrupadas, setHistoriasAgrupadas] = useState([]); // Consultas agrupadas por paciente
+  const [consultas, setConsultas] = useState([]);
+  const [historiasAgrupadas, setHistoriasAgrupadas] = useState([]);
   const [pacientesLista, setPacientesLista] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
-  
   const [guardando, setGuardando] = useState(false);
   
+  const notaRef = useRef(null); 
+
   // Estado para NUEVA o EDITAR Historia
   const [historiaData, setHistoriaData] = useState({
     id: null,
@@ -37,11 +41,10 @@ export default function Historias() {
     fecha_consulta: new Date().toISOString().slice(0, 16),
     proxima_consulta: '',
     consultorio: '',
-    nota_clinica: 'Diagnóstico:\n\n'
+    nota_clinica: 'Diagnóstico:\n\nTratamiento:\n\nSubjetivo:\n\nObjetivo: Peso:   Talla:   IMC:   TA:   FC:   Circunferencia de cintura:   Dinamometro:\n\nPlan Diagnóstico:\n\nPlan Terapéutico:'
   });
 
-  const listaConsultorios = [
-    "Medics", "", "Centro clinico"];
+  const listaConsultorios = ["Hospital Cardon"];
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -70,17 +73,11 @@ export default function Historias() {
       const validas = dbConsultas.filter(c => c.pacientes != null);
       setConsultas(validas);
 
-      // AGRUPAR POR PACIENTE PARA EVITAR DUPLICADOS EN LA VISTA PRINCIPAL
       const mapaAgrupado = new Map();
       validas.forEach(c => {
-        // Soporte por si Supabase devuelve arreglo u objeto
         const pac = Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes;
         if (!mapaAgrupado.has(pac.id)) {
-          mapaAgrupado.set(pac.id, {
-            paciente: pac,
-            ultima_consulta: c,
-            total_visitas: 1
-          });
+          mapaAgrupado.set(pac.id, { paciente: pac, ultima_consulta: c, total_visitas: 1 });
         } else {
           mapaAgrupado.get(pac.id).total_visitas += 1;
         }
@@ -97,11 +94,6 @@ export default function Historias() {
     navigate('/login');
   };
 
-  const getInitials = () => {
-    if (!userData || !userData.nombres || !userData.apellidos) return "DR";
-    return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
-  };
-
   const formatearFechaTexto = (fechaCompleta) => {
     if (!fechaCompleta) return '';
     const fecha = new Date(fechaCompleta);
@@ -112,9 +104,9 @@ export default function Historias() {
     return `${dia} de ${meses[fecha.getMonth()]} de ${fecha.getFullYear()} a las ${horas}:${minutos}`;
   };
 
-  // ================= LÓGICA DEL EDITOR DE TEXTO (WYSIWYG FAKE) =================
+  // ================= LÓGICA DEL EDITOR DE TEXTO =================
   const insertTextAtCursor = (textToInsert) => {
-    const textarea = document.getElementById('editorClinico');
+    const textarea = notaRef.current;
     if (!textarea) return;
     
     const start = textarea.selectionStart;
@@ -130,18 +122,118 @@ export default function Historias() {
     }, 0);
   };
 
+  // ================= DICTADO POR VOZ CON IA =================
+  const toggleDictado = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      return alert("Lo siento, tu navegador no soporta dictado por voz. Usa Google Chrome o Microsoft Edge.");
+    }
+
+    if (isListening) {
+      setIsListening(false);
+    } else {
+      setIsListening(true);
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        
+        if (finalTranscript !== '') {
+          insertTextAtCursor(' ' + finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Error en dictado: ", event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          recognition.start();
+        }
+      };
+
+      recognition.start();
+    }
+  };
+
+  // ================= EXPORTACIÓN: PDF Y WHATSAPP =================
+  const descargarPDFHistoria = () => {
+    if (!historiaData.nota_clinica.trim()) return alert("La nota clínica está vacía.");
+    const doc = new jsPDF();
+    
+    doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor(0, 130, 160);
+    doc.text("SOMA Cloud", 105, 20, { align: "center" });
+
+    doc.setFontSize(14); doc.setTextColor(50, 50, 50);
+    doc.text("HISTORIA EVOLUTIVA", 105, 30, { align: "center" });
+
+    doc.setLineWidth(0.5); doc.setDrawColor(200, 200, 200); doc.line(20, 35, 190, 35);
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    
+    doc.text(`Médico: Dr(a). ${userData?.nombres || ''} ${userData?.apellidos || ''}`, 20, 45);
+    doc.text(`Fecha: ${formatearFechaTexto(historiaData.fecha_consulta.split('T')[0])}`, 120, 45);
+    
+    let pacienteInfo = "Paciente no especificado";
+    if (pacienteSeleccionado) {
+      pacienteInfo = `${pacienteSeleccionado.nombres} ${pacienteSeleccionado.apellidos} - C.I: ${pacienteSeleccionado.cedula || 'N/A'}`;
+    } else {
+      const pacBD = pacientesLista.find(p => p.id === historiaData.id_paciente);
+      if (pacBD) pacienteInfo = `${pacBD.nombres} ${pacBD.apellidos} - C.I: ${pacBD.cedula || 'N/A'}`;
+    }
+    
+    doc.setFont("helvetica", "bold"); doc.text("Paciente:", 20, 55);
+    doc.setFont("helvetica", "normal"); doc.text(pacienteInfo, 40, 55);
+    doc.line(20, 62, 190, 62);
+
+    doc.text(doc.splitTextToSize(historiaData.nota_clinica, 170), 20, 72);
+    
+    doc.setFontSize(9); doc.setTextColor(150, 150, 150);
+    doc.text("Generado por SOMA Cloud", 105, 280, { align: "center" });
+    doc.save(`Historia_Evolutiva_${pacienteInfo.split('-')[0].trim()}.pdf`);
+  };
+
+  const compartirWhatsApp = () => {
+    let telefono = "";
+    let nombre = "";
+    if (pacienteSeleccionado) {
+      telefono = pacienteSeleccionado.telefono;
+      nombre = pacienteSeleccionado.nombres;
+    } else {
+      const pacBD = pacientesLista.find(p => p.id === historiaData.id_paciente);
+      if (pacBD) {
+        telefono = pacBD.telefono;
+        nombre = pacBD.nombres;
+      }
+    }
+
+    if (!telefono) return alert("Este paciente no tiene número registrado.");
+    let num = telefono.replace(/\D/g, '');
+    if (num.startsWith('0')) num = '58' + num.substring(1);
+    else if (!num.startsWith('58') && num.length === 10) num = '58' + num;
+
+    const mensaje = `Hola ${nombre}, aquí tienes el resumen de tu consulta:\n\n${historiaData.nota_clinica}`;
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`, '_blank');
+  };
+
   // ================= FUNCIONES DE NAVEGACIÓN Y GUARDADO =================
-  
-  // Abre la lista de historias de un paciente específico
   const verHistorialPaciente = (paciente) => {
     setPacienteSeleccionado(paciente);
     setIsModalConsultaOpen(false);
   };
 
-  // Abre el editor para crear/editar una consulta específica
   const abrirEditorHistoria = (consulta = null, idPacienteForzado = null) => {
     if (consulta) {
-      // MODO EDICIÓN
       setHistoriaData({
         id: consulta.id,
         id_paciente: consulta.id_paciente,
@@ -151,14 +243,13 @@ export default function Historias() {
         nota_clinica: consulta.nota_clinica || consulta.sintomas || '' 
       });
     } else {
-      // MODO NUEVO
       setHistoriaData({
         id: null,
         id_paciente: idPacienteForzado || (pacienteSeleccionado ? pacienteSeleccionado.id : ''),
         fecha_consulta: new Date().toISOString().slice(0, 16),
         proxima_consulta: '',
         consultorio: '',
-        nota_clinica: 'Diagnóstico:\n\n'
+        nota_clinica: 'Diagnóstico:\n\nTratamiento:\n\nSubjetivo:\n\nObjetivo: Peso:   Talla:   IMC:   TA:   FC:   Circunferencia de cintura:   Dinamometro:\n\nPlan Diagnóstico:\n\nPlan Terapéutico:'
       });
     }
     setIsModalConsultaOpen(true);
@@ -167,10 +258,8 @@ export default function Historias() {
   const handleGuardarHistoria = async (e) => {
     e.preventDefault();
     setGuardando(true);
-
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
       const payload = {
         id_medico: session.user.id,
         id_paciente: historiaData.id_paciente,
@@ -192,11 +281,10 @@ export default function Historias() {
       }
 
       if (error) {
-        if (error.message.includes('column')) {
-          alert("Asegúrate de agregar las nuevas columnas a la tabla 'consultas' en Supabase.");
-        } else throw error;
+        if (error.message.includes('column')) alert("Asegúrate de agregar las nuevas columnas a la tabla 'consultas' en Supabase.");
+        else throw error;
       } else {
-        await fetchData(); // Refrescar los datos para que aparezcan enseguida
+        await fetchData(); 
         setIsModalConsultaOpen(false);
       }
     } catch (error) {
@@ -206,7 +294,6 @@ export default function Historias() {
     }
   };
 
-  // ================= FILTROS =================
   const agrupadasFiltradas = historiasAgrupadas.filter(item => {
     const term = busqueda.toLowerCase();
     return item.paciente.nombres.toLowerCase().includes(term) || 
@@ -214,9 +301,7 @@ export default function Historias() {
            (item.paciente.cedula && item.paciente.cedula.includes(term));
   });
 
-  const consultasDelPaciente = pacienteSeleccionado 
-    ? consultas.filter(c => c.id_paciente === pacienteSeleccionado.id) 
-    : [];
+  const consultasDelPaciente = pacienteSeleccionado ? consultas.filter(c => c.id_paciente === pacienteSeleccionado.id) : [];
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#0a0a0a] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
@@ -226,12 +311,31 @@ export default function Historias() {
       )}
 
       {/* ================= SIDEBAR ================= */}
-      <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#111111] border-r border-slate-200 dark:border-white/5 flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 w-64 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}>
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 
+          bg-white dark:bg-[#16161a] 
+          border-r border-slate-200/80 dark:border-white/[0.04] 
+          flex flex-col justify-between 
+          transform transition-all duration-300 ease-in-out 
+          md:relative md:translate-x-0
+          md:m-4 md:mr-0 md:rounded-3xl 
+          shadow-xl shadow-slate-200/50 dark:shadow-none
+          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
+          ${isCollapsed ? 'md:w-24' : 'md:w-68'}
+        `}>
         <div>
           <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-widest overflow-hidden whitespace-nowrap">
-              <span className="text-cyan-600 dark:text-cyan-400 text-2xl">*</span>{!isCollapsed && <span>SOMA</span>}
-            </h1>
+            <Link to="/dashboard" className="flex items-center overflow-hidden whitespace-nowrap">
+              {isCollapsed ? (
+                <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
+              ) : (
+                <>
+                  <img src="/soma_logo.png" alt="SOMA" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
+                </>
+              )}
+            </Link>
             {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
           </div>
 
@@ -244,7 +348,23 @@ export default function Historias() {
               <Link to="/agenda" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Calendar size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}</Link>
             </nav>
           </div>
+           {/* Menú: Configuración */}
+                    <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+                      {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
+                      <nav className="space-y-1.5">
+                        <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                          <User size={20} className="shrink-0" />
+                          {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
+                        </Link>
+                        <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                          <Settings size={20} className="shrink-0" />
+                          {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
+                        </Link>
+                      </nav>
+                    </div>
         </div>
+
+        
 
         <div className="p-4 border-t border-slate-200 dark:border-white/5 flex flex-col">
           <button onClick={handleLogout} className="flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors"><LogOut size={20} className="shrink-0" />{!isCollapsed && <span>Cerrar Sesión</span>}</button>
@@ -266,14 +386,11 @@ export default function Historias() {
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           
-          {/* ========================================================
-              VISTA 1: LISTADO GLOBAL (AGRUPADO POR PACIENTE)
-              ======================================================== */}
+          {/* VISTA 1: LISTADO GLOBAL */}
           {!isModalConsultaOpen && !pacienteSeleccionado && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
                 
-                {/* Cabecera Azul */}
                 <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
                     <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Historias clínicas</h2>
@@ -388,9 +505,7 @@ export default function Historias() {
             </div>
           )}
 
-          {/* ========================================================
-              VISTA 2: LISTADO DE HISTORIAS DEL PACIENTE ESPECÍFICO
-              ======================================================== */}
+          {/* VISTA 2: LISTADO DE HISTORIAS DEL PACIENTE ESPECÍFICO */}
           {!isModalConsultaOpen && pacienteSeleccionado && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               
@@ -463,9 +578,7 @@ export default function Historias() {
             </div>
           )}
 
-          {/* ========================================================
-              VISTA 3: CREAR / EDITAR HISTORIA CLÍNICA (EL EDITOR)
-              ======================================================== */}
+          {/* VISTA 3: CREAR / EDITAR HISTORIA CLÍNICA (EL EDITOR PREMIUM) */}
           {isModalConsultaOpen && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden">
@@ -570,48 +683,93 @@ export default function Historias() {
                     </div>
                   </div>
 
-                  {/* Bloque 2: Nota Clínica (WYSIWYG FAKE) */}
+                  {/* Bloque 2: Nota Clínica (WYSIWYG PRO) */}
                   <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
-                    <div className="mb-4">
-                      <h4 className="font-bold text-slate-900 dark:text-white">Nota clínica</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Contenido principal de la consulta.</p>
-                    </div>
                     
-                    <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-[#0081a7] dark:text-cyan-400 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors mb-6">
-                      <FileSignature size={14} /> Seleccionar Plantilla
-                    </button>
+                    {/* Encabezado del Editor */}
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white">Nota clínica</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Contenido principal de la consulta.</p>
+                        <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-[#0081a7] dark:text-cyan-400 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors mt-3">
+                          <FileSignature size={14} /> Seleccionar Plantilla
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button 
+                          onClick={toggleDictado} 
+                          className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-full text-xs font-bold transition-colors ${
+                            isListening 
+                              ? 'bg-red-50 border-red-200 text-red-500 dark:bg-red-900/30 dark:border-red-800/50' 
+                              : 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-800/50 hover:bg-emerald-100'
+                          }`}
+                        >
+                          <Mic size={14} className={isListening ? "animate-pulse" : ""} /> {isListening ? 'Escuchando...' : 'Dictar con IA'}
+                        </button>
+                        <button onClick={descargarPDFHistoria} className="flex items-center gap-1.5 px-3 py-1.5 border border-rose-200 dark:border-rose-800/50 bg-rose-50 dark:bg-rose-900/30 text-rose-600 rounded-full text-xs font-bold hover:bg-rose-100 transition-colors">
+                          <FileText size={14} /> PDF
+                        </button>
+                        <button onClick={compartirWhatsApp} className="flex items-center gap-1.5 px-3 py-1.5 border border-[#25D366]/30 bg-[#25D366]/10 text-[#25D366] rounded-full text-xs font-bold hover:bg-[#25D366]/20 transition-colors">
+                          <MessageSquare size={14} /> Por WhatsApp
+                        </button>
+                      </div>
+                    </div>
 
-                    {/* Contenedor del Editor */}
+                    {/* Contenedor del Editor Exacto a la Foto */}
                     <div className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-[#111111]">
+                      
                       {/* Menú Texto Superior */}
-                      <div className="hidden sm:flex items-center gap-4 px-4 py-2 text-[11px] font-medium text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                        <span className="cursor-pointer hover:text-cyan-500">Archivo</span>
-                        <span className="cursor-pointer hover:text-cyan-500">Editar</span>
-                        <span className="cursor-pointer hover:text-cyan-500">Ver</span>
-                        <span className="cursor-pointer hover:text-cyan-500">Insertar</span>
-                        <span className="cursor-pointer hover:text-cyan-500">Formato</span>
-                        <span className="cursor-pointer hover:text-cyan-500">Herramientas</span>
+                      <div className="hidden sm:flex items-center justify-between px-4 py-2 text-[11px] font-medium text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                        <div className="flex gap-4">
+                          <span className="cursor-pointer hover:text-cyan-500">Archivo</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Editar</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Ver</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Insertar</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Formato</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Herramientas</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Tabla</span>
+                          <span className="cursor-pointer hover:text-cyan-500">Ayuda</span>
+                        </div>
+                        <span className="flex items-center gap-1 text-orange-500 font-bold cursor-pointer hover:underline">
+                          <Zap size={12} /> Upgrade
+                        </span>
                       </div>
                       
-                      {/* Barra de Herramientas (Botones Funcionales para Inyectar Markdown/Texto) */}
-                      <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                      {/* Barra de Herramientas */}
+                      <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Undo size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Redo size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Paintbrush size={14} /></button>
+                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
                         <select className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option>Párrafo</option></select>
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button type="button" onClick={() => insertTextAtCursor('**Texto Negrita**')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Negrita"><Bold size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('*Texto Cursiva*')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Cursiva"><Italic size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('__Texto Subrayado__')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Subrayado"><Underline size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('~~Texto Tachado~~')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Tachar"><Strikethrough size={14} /></button>
+                        <select className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option>12pt</option></select>
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button type="button" onClick={() => insertTextAtCursor('\n- Item 1\n- Item 2')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista de viñetas"><List size={14} /></button>
-                        <button type="button" onClick={() => insertTextAtCursor('\n1. Item 1\n2. Item 2')} className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista numerada"><ListOrdered size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('**Texto Negrita**')} className="p-1.5 text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded" title="Negrita"><Bold size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('*Texto Cursiva*')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Cursiva"><Italic size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('__Texto Subrayado__')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Subrayado"><Underline size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('~~Texto Tachado~~')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Tachar"><Strikethrough size={14} /></button>
+                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignLeft size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignCenter size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignRight size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><AlignJustify size={14} /></button>
+                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        <button type="button" onClick={() => insertTextAtCursor('\n- Item 1\n- Item 2')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista de viñetas"><List size={14} /></button>
+                        <button type="button" onClick={() => insertTextAtCursor('\n1. Item 1\n2. Item 2')} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Lista numerada"><ListOrdered size={14} /></button>
+                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><LinkIcon size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><ImageIcon size={14} /></button>
+                        <button className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded"><Type size={14} className="border-b-2 border-black dark:border-white" /></button>
                       </div>
 
                       {/* Área de Texto Editable */}
                       <textarea 
                         id="editorClinico"
+                        ref={notaRef}
                         value={historiaData.nota_clinica}
                         onChange={(e) => setHistoriaData({...historiaData, nota_clinica: e.target.value})}
-                        className="w-full min-h-[300px] p-6 text-sm text-slate-900 dark:text-white bg-white dark:bg-[#111111] outline-none resize-y custom-scrollbar leading-relaxed"
+                        className="w-full min-h-[400px] p-6 text-[15px] font-medium text-slate-900 dark:text-white bg-white dark:bg-[#111111] outline-none resize-y custom-scrollbar leading-relaxed"
                         placeholder="Escribe aquí el motivo de consulta, examen físico, diagnóstico..."
                       ></textarea>
                     </div>
