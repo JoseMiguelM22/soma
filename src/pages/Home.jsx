@@ -380,7 +380,7 @@ export default function Home() {
           100% { transform: translateX(-50%); }
         }
         .animate-marquee {
-          animation: marquee 15s linear infinite;
+          animation: marquee 50s linear infinite;
           width: max-content;
         }
         @keyframes float {

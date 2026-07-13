@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Users, Calendar, LogOut, Menu, Sun, Moon, 
-  X, PanelLeft, Activity, Clock, ChevronDown, FileText
+  X, PanelLeft, Activity, Clock, ChevronDown, FileText, UserPlus, Save, Search
 } from 'lucide-react';
 
 export default function DashboardAdmision() {
@@ -14,6 +14,18 @@ export default function DashboardAdmision() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
+  const [openPacienteMenu, setOpenPacienteMenu] = useState(false);
+  const [openMedicoMenu, setOpenMedicoMenu] = useState(false);
+  
+  const [searchPaciente, setSearchPaciente] = useState('');
+  const [searchMedico, setSearchMedico] = useState('');
+  
+  const [showRegistroModal, setShowRegistroModal] = useState(false);
+  const [guardandoPaciente, setGuardandoPaciente] = useState(false);
+  const [nuevoPaciente, setNuevoPaciente] = useState({
+    nombres: '', apellidos: '', cedula: '', telefono: '', fecha_nacimiento: '', sexo: ''
+  });
+
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,15 +35,16 @@ export default function DashboardAdmision() {
   const [listaPacientes, setListaPacientes] = useState([]);
   const [listaMedicos, setListaMedicos] = useState([]);
 
-  // ÚNICA FUENTE DE VERDAD
+  // ================= LA ÚNICA FUENTE DE VERDAD =================
+  // Todo se guarda directamente aquí. Nada de variables dobles.
   const [triajeData, setTriajeData] = useState({
     id_paciente: '',
     id_medico: '',
-    motivo: '',
-    ta: '',
-    fc: '',
-    peso: '',
-    talla: '',
+    motivo: '', 
+    ta: '', 
+    fc: '', 
+    peso: '', 
+    talla: '', 
     sintomasRapidos: [] 
   });
 
@@ -53,7 +66,6 @@ export default function DashboardAdmision() {
     if (!session) return navigate('/login');
 
     const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
-    
     if (dbUser?.rol === 'especialista') {
       navigate('/dashboard');
       return;
@@ -95,9 +107,12 @@ export default function DashboardAdmision() {
     return `${userData.nombres?.charAt(0)}${userData.apellidos?.charAt(0)}`.toUpperCase();
   };
 
-  // MÁS SIMPLE Y EFECTIVO: Actualiza el estado instantáneamente
   const handleInputChange = (e) => {
-    setTriajeData({ ...triajeData, [e.target.name]: e.target.value });
+    setTriajeData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleNuevoPacienteChange = (e) => {
+    setNuevoPaciente({ ...nuevoPaciente, [e.target.name]: e.target.value });
   };
 
   const handleCheckboxChange = (label) => {
@@ -111,10 +126,42 @@ export default function DashboardAdmision() {
     });
   };
 
+  const handleRegistrarPaciente = async (e) => {
+    e.preventDefault();
+    setGuardandoPaciente(true);
+
+    const pacienteData = { ...nuevoPaciente };
+    if (!pacienteData.fecha_nacimiento) pacienteData.fecha_nacimiento = null;
+
+    try {
+      const { data, error } = await supabase
+        .from('pacientes')
+        .insert([pacienteData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      alert('¡Paciente registrado exitosamente!');
+      
+      // Actualizamos la lista y SELECCIONAMOS automáticamente
+      setListaPacientes(prev => [...prev, data].sort((a, b) => a.nombres.localeCompare(b.nombres)));
+      setTriajeData(prev => ({ ...prev, id_paciente: data.id }));
+      
+      setNuevoPaciente({ nombres: '', apellidos: '', cedula: '', telefono: '', fecha_nacimiento: '', sexo: '' });
+      setShowRegistroModal(false);
+
+    } catch (error) {
+      alert("Error al registrar paciente: " + error.message);
+    } finally {
+      setGuardandoPaciente(false);
+    }
+  };
+
   const handleGuardarTriaje = async (e) => {
     e.preventDefault();
     if (!triajeData.id_paciente || !triajeData.id_medico) {
-      alert("Por favor selecciona un paciente y un médico.");
+      alert("Por favor selecciona un paciente y un médico en la cabecera de la historia clínica.");
       return;
     }
 
@@ -124,12 +171,11 @@ export default function DashboardAdmision() {
       const sintomasList = triajeData.sintomasRapidos.length > 0 ? `Síntomas marcados: ${triajeData.sintomasRapidos.join(', ')}.` : '';
       const signosFormateados = `TA: ${triajeData.ta || 'N/A'} | FC: ${triajeData.fc || 'N/A'} | Peso: ${triajeData.peso || 'N/A'}kg | Talla: ${triajeData.talla || 'N/A'}m. ${sintomasList}`;
 
-      // CORRECCIÓN: Cambiamos 'motivo_admision' por 'motivo' para que coincida con tu base de datos
       const { error } = await supabase.from('consultas').insert([{
         id_paciente: triajeData.id_paciente,
         id_medico: triajeData.id_medico,
         estado: 'En Espera',
-        motivo: triajeData.motivo, // <--- ESTO ES LO QUE ESTABA CAUSANDO EL ERROR
+        motivo: triajeData.motivo, 
         signos_vitales: signosFormateados,
         fecha_consulta: new Date().toISOString(),
       }]);
@@ -138,18 +184,27 @@ export default function DashboardAdmision() {
 
       alert('¡Paciente enviado a la Sala de Espera del Especialista con éxito!');
       
-      // Limpiar estados
-      setPacienteSeleccionado(null);
-      setMedicoSeleccionado(null);
-      setTriajeData({ motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
+      setTriajeData({ id_paciente: '', id_medico: '', motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
       fetchData(); 
       
     } catch (error) {
-      alert("Error al guardar: " + error.message);
+      alert("Error al guardar triaje: " + error.message);
     } finally {
       setGuardando(false);
     }
   };
+
+  // Buscamos los datos completos para pintarlos en la hoja
+  const pacienteSeleccionado = listaPacientes.find(p => String(p.id) === String(triajeData.id_paciente));
+  const medicoSeleccionado = listaMedicos.find(m => String(m.id_auth || m.id) === String(triajeData.id_medico));
+
+  // Filtros
+  const pacientesFiltrados = listaPacientes.filter(p => 
+    (p.nombres + ' ' + p.apellidos + ' ' + p.cedula).toLowerCase().includes(searchPaciente.toLowerCase())
+  );
+  const medicosFiltrados = listaMedicos.filter(m => 
+    (m.nombres + ' ' + m.apellidos + ' ' + (m.especialidad || '')).toLowerCase().includes(searchMedico.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -159,17 +214,86 @@ export default function DashboardAdmision() {
     );
   }
 
-  // Encontramos los datos completos solo para mostrarlos bonitos en la UI
-  const pacienteSeleccionado = listaPacientes.find(p => String(p.id) === String(triajeData.id_paciente));
-  const medicoSeleccionado = listaMedicos.find(m => String(m.id_auth || m.id) === String(triajeData.id_medico));
-
   return (
     <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>}
+      {/* ========================================================================= */}
+      {/* MODAL DE REGISTRO RÁPIDO DE PACIENTE */}
+      {/* ========================================================================= */}
+      {showRegistroModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="w-full max-w-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+            
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-white/5">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <UserPlus className="text-[#2563eb]" size={24} /> Registrar Nuevo Paciente
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">Crea la ficha para enviarlo a consulta.</p>
+              </div>
+              <button onClick={() => setShowRegistroModal(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-100 dark:bg-white/5 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
 
+            <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar-gruesa">
+              <form id="formNuevoPaciente" onSubmit={handleRegistrarPaciente} className="space-y-4">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Nombres</label>
+                    <input type="text" name="nombres" required value={nuevoPaciente.nombres} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. Juan Carlos" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Apellidos</label>
+                    <input type="text" name="apellidos" required value={nuevoPaciente.apellidos} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. Pérez Gómez" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Cédula</label>
+                    <input type="text" name="cedula" required value={nuevoPaciente.cedula} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. 12345678" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Teléfono</label>
+                    <input type="text" name="telefono" value={nuevoPaciente.telefono} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. 04141234567" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Fec. Nacimiento</label>
+                    <input type="date" name="fecha_nacimiento" value={nuevoPaciente.fecha_nacimiento} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Sexo</label>
+                    <select name="sexo" value={nuevoPaciente.sexo} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all">
+                      <option value="">Seleccionar...</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Femenino">Femenino</option>
+                    </select>
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#0B0D12] flex justify-end gap-3">
+              <button type="button" onClick={() => setShowRegistroModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+                Cancelar
+              </button>
+              <button type="submit" form="formNuevoPaciente" disabled={guardandoPaciente} className="px-8 py-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 disabled:opacity-50">
+                {guardandoPaciente ? 'Guardando...' : <><Save size={18} /> Guardar Ficha</>}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= HEADER SUPERIOR ================= */}
       <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-slate-200/60 dark:border-white/[0.04] bg-white/40 dark:bg-[#0B0D12]/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
-        
         <div className="flex items-center gap-4">
           <img src={isDarkMode ? "/soma_logo_blanco.png" : "/soma_logo.png"} alt="SOMA" className="h-7 object-contain" />
           <div className="h-6 w-px bg-slate-300 dark:bg-white/10 hidden sm:block"></div>
@@ -199,8 +323,8 @@ export default function DashboardAdmision() {
         </div>
       </header>
 
+      {/* ================= CONTENIDO PRINCIPAL ================= */}
       <main className="flex-1 overflow-y-auto w-full relative custom-scrollbar p-6 lg:p-10">
-        
         <div className="max-w-[1200px] mx-auto space-y-8">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -248,62 +372,131 @@ export default function DashboardAdmision() {
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4 relative">
                     
-                    {/* ========================================================================= */}
-                    {/* ESTRATEGIA: FAKE UI + SELECT INVISIBLE (INFALIBLE) */}
-                    {/* ========================================================================= */}
-
-                    {/* FAKE UI PACIENTE */}
-                    <div className="relative group">
+                    {/* ======================================================== */}
+                    {/* SELECT PACIENTE */}
+                    {/* ======================================================== */}
+                    <div className="relative">
                       <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
-                      <div className="w-full flex items-center justify-between py-2 border-b border-slate-400 group-hover:border-[#2563eb] transition-colors">
+                      <button 
+                        type="button"
+                        onClick={() => setOpenPacienteMenu(!openPacienteMenu)}
+                        className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
+                      >
                         <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteSeleccionado ? 'text-blue-900 italic' : 'text-slate-400'}`}>
                           {pacienteSeleccionado ? `${pacienteSeleccionado.nombres} ${pacienteSeleccionado.apellidos}` : '(Clic para buscar...)'}
                         </span>
-                        <ChevronDown size={16} className="shrink-0 text-slate-500 group-hover:text-[#2563eb] transition-colors" />
-                      </div>
+                        <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openPacienteMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
+                      </button>
                       
-                      {/* EL VERDADERO SELECT (INVISIBLE) */}
-                      <select 
-                        name="id_paciente"
-                        value={triajeData.id_paciente}
-                        onChange={handleInputChange}
-                        className="absolute bottom-0 left-0 w-full h-10 opacity-0 cursor-pointer"
-                        required
-                      >
-                        <option value="" disabled>Seleccionar paciente...</option>
-                        {listaPacientes.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombres} {p.apellidos} - C.I: {p.cedula}
-                          </option>
-                        ))}
-                      </select>
+                      {openPacienteMenu && (
+                        <>
+                          <div className="fixed inset-0 z-[90]" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
+                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                            
+                            <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+                              <Search size={16} className="text-slate-400 shrink-0" />
+                              <input 
+                                type="text" 
+                                placeholder="Buscar nombre o cédula..." 
+                                value={searchPaciente}
+                                onChange={(e) => setSearchPaciente(e.target.value)}
+                                className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
+                                autoFocus
+                              />
+                            </div>
+
+                            <div className="p-2 border-b border-slate-200 bg-slate-50/50">
+                              <button 
+                                type="button" 
+                                onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); setShowRegistroModal(true); }}
+                                className="w-full flex items-center justify-center gap-2 py-2 bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg font-bold text-sm transition-colors"
+                              >
+                                <UserPlus size={16} /> Registrar Nuevo Paciente
+                              </button>
+                            </div>
+
+                            <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa">
+                              {pacientesFiltrados.length === 0 ? (
+                                <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron pacientes.</div>
+                              ) : (
+                                pacientesFiltrados.map(p => (
+                                  <div 
+                                    key={p.id} 
+                                    onClick={(e) => { 
+                                      e.stopPropagation();
+                                      setTriajeData(prev => ({ ...prev, id_paciente: p.id })); 
+                                      setOpenPacienteMenu(false); 
+                                      setSearchPaciente(''); 
+                                    }}
+                                    className="px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-0 font-medium flex justify-between items-center group"
+                                  >
+                                    <span>{p.nombres} {p.apellidos}</span>
+                                    <span className="opacity-50 text-xs font-normal group-hover:opacity-100 transition-opacity">C.I: {p.cedula}</span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    {/* FAKE UI MÉDICO */}
-                    <div className="relative group">
+                    {/* ======================================================== */}
+                    {/* SELECT MÉDICO */}
+                    {/* ======================================================== */}
+                    <div className="relative">
                       <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
-                      <div className="w-full flex items-center justify-between py-2 border-b border-slate-400 group-hover:border-[#2563eb] transition-colors">
+                      <button 
+                        type="button"
+                        onClick={() => setOpenMedicoMenu(!openMedicoMenu)}
+                        className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
+                      >
                         <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoSeleccionado ? 'text-blue-900 italic' : 'text-slate-400'}`}>
                           {medicoSeleccionado ? `Dr(a). ${medicoSeleccionado.nombres} ${medicoSeleccionado.apellidos}` : '(Clic para asignar...)'}
                         </span>
-                        <ChevronDown size={16} className="shrink-0 text-slate-500 group-hover:text-[#2563eb] transition-colors" />
-                      </div>
+                        <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openMedicoMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
+                      </button>
                       
-                      {/* EL VERDADERO SELECT (INVISIBLE) */}
-                      <select 
-                        name="id_medico"
-                        value={triajeData.id_medico}
-                        onChange={handleInputChange}
-                        className="absolute bottom-0 left-0 w-full h-10 opacity-0 cursor-pointer"
-                        required
-                      >
-                        <option value="" disabled>Seleccionar médico...</option>
-                        {listaMedicos.map(m => (
-                          <option key={m.id_auth || m.id} value={m.id_auth || m.id}>
-                            Dr(a). {m.nombres} {m.apellidos} - {m.especialidad || 'Especialista'}
-                          </option>
-                        ))}
-                      </select>
+                      {openMedicoMenu && (
+                        <>
+                          <div className="fixed inset-0 z-[90]" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
+                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                            
+                            <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+                              <Search size={16} className="text-slate-400 shrink-0" />
+                              <input 
+                                type="text" 
+                                placeholder="Buscar médico o especialidad..." 
+                                value={searchMedico}
+                                onChange={(e) => setSearchMedico(e.target.value)}
+                                className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
+                                autoFocus
+                              />
+                            </div>
+
+                            <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa">
+                              {medicosFiltrados.length === 0 ? (
+                                <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron médicos.</div>
+                              ) : (
+                                medicosFiltrados.map(m => (
+                                  <div 
+                                    key={m.id_auth || m.id} 
+                                    onClick={(e) => { 
+                                      e.stopPropagation();
+                                      setTriajeData(prev => ({ ...prev, id_medico: m.id_auth || m.id })); 
+                                      setOpenMedicoMenu(false); 
+                                      setSearchMedico('');
+                                    }}
+                                    className="px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-0 font-medium"
+                                  >
+                                    Dr(a). {m.nombres} {m.apellidos} <span className="opacity-50 text-xs ml-1 font-normal">- {m.especialidad || 'Especialista'}</span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -404,9 +597,17 @@ export default function DashboardAdmision() {
       </main>
 
       <style>{`
+        /* SCROLLBAR GENERAL DEL SISTEMA */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
+        
+        /* SCROLLBAR SÚPER VISIBLE PARA LOS MENÚS DESPLEGABLES */
+        .custom-scrollbar-gruesa::-webkit-scrollbar { width: 12px; }
+        .custom-scrollbar-gruesa::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 0 0 6px 0; }
+        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 6px; border: 3px solid #f1f5f9; }
+        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
+        
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-5px); }
           to { opacity: 1; transform: translateY(0); }
