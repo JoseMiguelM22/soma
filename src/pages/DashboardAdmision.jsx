@@ -1,0 +1,417 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../services/supabaseClient';
+import { 
+  Users, Calendar, LogOut, Menu, Sun, Moon, 
+  X, PanelLeft, Activity, Clock, ChevronDown, FileText
+} from 'lucide-react';
+
+export default function DashboardAdmision() {
+  const navigate = useNavigate();
+  
+  // ================= ESTADOS DE UI =================
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  // ================= ESTADOS DE DATOS =================
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  
+  const [pacientesEnEspera, setPacientesEnEspera] = useState(0);
+  const [listaPacientes, setListaPacientes] = useState([]);
+  const [listaMedicos, setListaMedicos] = useState([]);
+
+  // ÚNICA FUENTE DE VERDAD
+  const [triajeData, setTriajeData] = useState({
+    id_paciente: '',
+    id_medico: '',
+    motivo: '',
+    ta: '',
+    fc: '',
+    peso: '',
+    talla: '',
+    sintomasRapidos: [] 
+  });
+
+  const listaSintomasIVSS = [
+    { id: '1', label: 'Fiebre' },
+    { id: '2', label: 'Pérdida de peso' },
+    { id: '3', label: 'Erupciones (Piel)' },
+    { id: '4', label: 'Mareos / Síncope' },
+    { id: '5', label: 'Cansancio Ocular' },
+    { id: '6', label: 'Dolor general' },
+  ];
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
+
+  const fetchData = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return navigate('/login');
+
+    const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
+    
+    if (dbUser?.rol === 'especialista') {
+      navigate('/dashboard');
+      return;
+    }
+    setUserData(dbUser);
+
+    const hoy = new Date().toISOString().split('T')[0];
+    const { count } = await supabase
+      .from('consultas')
+      .select('*', { count: 'exact', head: true })
+      .eq('estado', 'En Espera')
+      .gte('created_at', `${hoy}T00:00:00.000Z`);
+    setPacientesEnEspera(count || 0);
+
+    const { data: pacientesBD } = await supabase.from('pacientes').select('*').order('nombres', { ascending: true });
+    if (pacientesBD) setListaPacientes(pacientesBD);
+
+    const { data: todosLosUsuarios } = await supabase.from('usuarios').select('*');
+    if (todosLosUsuarios) {
+      const soloMedicos = todosLosUsuarios.filter(user => 
+        user.rol === 'especialista' || 
+        (user.especialidad && user.especialidad !== 'Admisión / Triaje')
+      );
+      setListaMedicos(soloMedicos.filter(m => m.id_auth !== session.user.id));
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchData(); }, [navigate]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  };
+
+  const getInitials = () => {
+    if (!userData) return "AD";
+    return `${userData.nombres?.charAt(0)}${userData.apellidos?.charAt(0)}`.toUpperCase();
+  };
+
+  // MÁS SIMPLE Y EFECTIVO: Actualiza el estado instantáneamente
+  const handleInputChange = (e) => {
+    setTriajeData({ ...triajeData, [e.target.name]: e.target.value });
+  };
+
+  const handleCheckboxChange = (label) => {
+    setTriajeData(prev => {
+      const currentSintomas = [...prev.sintomasRapidos];
+      if (currentSintomas.includes(label)) {
+        return { ...prev, sintomasRapidos: currentSintomas.filter(s => s !== label) };
+      } else {
+        return { ...prev, sintomasRapidos: [...currentSintomas, label] };
+      }
+    });
+  };
+
+  const handleGuardarTriaje = async (e) => {
+    e.preventDefault();
+    if (!triajeData.id_paciente || !triajeData.id_medico) {
+      alert("Por favor selecciona un paciente y un médico.");
+      return;
+    }
+
+    setGuardando(true);
+
+    try {
+      const sintomasList = triajeData.sintomasRapidos.length > 0 ? `Síntomas marcados: ${triajeData.sintomasRapidos.join(', ')}.` : '';
+      const signosFormateados = `TA: ${triajeData.ta || 'N/A'} | FC: ${triajeData.fc || 'N/A'} | Peso: ${triajeData.peso || 'N/A'}kg | Talla: ${triajeData.talla || 'N/A'}m. ${sintomasList}`;
+
+      // CORRECCIÓN: Cambiamos 'motivo_admision' por 'motivo' para que coincida con tu base de datos
+      const { error } = await supabase.from('consultas').insert([{
+        id_paciente: triajeData.id_paciente,
+        id_medico: triajeData.id_medico,
+        estado: 'En Espera',
+        motivo: triajeData.motivo, // <--- ESTO ES LO QUE ESTABA CAUSANDO EL ERROR
+        signos_vitales: signosFormateados,
+        fecha_consulta: new Date().toISOString(),
+      }]);
+
+      if (error) throw error;
+
+      alert('¡Paciente enviado a la Sala de Espera del Especialista con éxito!');
+      
+      // Limpiar estados
+      setPacienteSeleccionado(null);
+      setMedicoSeleccionado(null);
+      setTriajeData({ motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
+      fetchData(); 
+      
+    } catch (error) {
+      alert("Error al guardar: " + error.message);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0B0D12]">
+        <div className="w-16 h-16 border-4 border-cyan-100 dark:border-slate-800 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
+      </div>
+    );
+  }
+
+  // Encontramos los datos completos solo para mostrarlos bonitos en la UI
+  const pacienteSeleccionado = listaPacientes.find(p => String(p.id) === String(triajeData.id_paciente));
+  const medicoSeleccionado = listaMedicos.find(m => String(m.id_auth || m.id) === String(triajeData.id_medico));
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
+      
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>}
+
+      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-slate-200/60 dark:border-white/[0.04] bg-white/40 dark:bg-[#0B0D12]/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
+        
+        <div className="flex items-center gap-4">
+          <img src={isDarkMode ? "/soma_logo_blanco.png" : "/soma_logo.png"} alt="SOMA" className="h-7 object-contain" />
+          <div className="h-6 w-px bg-slate-300 dark:bg-white/10 hidden sm:block"></div>
+          <span className="hidden sm:block text-xs font-black tracking-widest text-slate-500 uppercase">Módulo de Admisión</span>
+        </div>
+
+        <div className="flex items-center gap-4 lg:gap-6">
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-right">
+              <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{userData?.nombres} {userData?.apellidos}</p>
+              <p className="text-[10px] text-[#b0ff4c] font-black tracking-widest uppercase">Asistente</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-[#16161a] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white flex items-center justify-center font-bold shadow-sm">
+              {getInitials()}
+            </div>
+          </div>
+
+          <button onClick={handleLogout} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all border border-rose-500/20">
+            <LogOut size={16} /> <span className="hidden sm:inline">Salir</span>
+          </button>
+          
+          <div className="w-px h-6 bg-slate-300 dark:bg-white/10 hidden sm:block"></div>
+
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-[#b0ff4c] bg-white dark:bg-[#16161a] border dark:border-white/[0.04] rounded-xl shadow-sm transition-all">
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto w-full relative custom-scrollbar p-6 lg:p-10">
+        
+        <div className="max-w-[1200px] mx-auto space-y-8">
+          
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                Recepción y Triaje
+              </h2>
+              <p className="text-slate-500 mt-2 text-sm sm:text-base">Llena la hoja clínica del paciente para remitirlo a la sala de espera del médico.</p>
+            </div>
+            
+            <div className="bg-[#b0ff4c] text-black rounded-2xl px-6 py-4 flex items-center gap-6 shadow-[0_10px_30px_rgba(176,255,76,0.15)] shrink-0">
+              <div className="w-10 h-10 bg-black text-[#b0ff4c] rounded-full flex items-center justify-center">
+                <Clock size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-0.5">En Espera Hoy</p>
+                <h3 className="text-3xl font-black leading-none">{pacientesEnEspera}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 animate-[fadeIn_0.3s_ease-out]">
+            
+            <div className="bg-[#F8F7F4] text-slate-900 border border-[#D5D0C6] rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col mx-auto">
+              
+              <div className="p-8 pb-4 border-b-2 border-slate-400 bg-[#F8F7F4] rounded-t-md">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">SISTEMA MÉDICO SOMA</p>
+                    <p className="text-xs font-semibold text-slate-600">DEPARTAMENTO DE ADMISIÓN</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Forma 01-TRJ</p>
+                  </div>
+                </div>
+                
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-serif font-bold text-slate-800 tracking-wider">HISTORIA CLÍNICA</h2>
+                  <p className="text-sm font-serif text-slate-600 tracking-widest uppercase mt-1">Parte I - Triaje</p>
+                </div>
+              </div>
+              
+              <div className="px-8 pb-8">
+                <form id="formTriaje" onSubmit={handleGuardarTriaje} className="space-y-8">
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4 relative">
+                    
+                    {/* ========================================================================= */}
+                    {/* ESTRATEGIA: FAKE UI + SELECT INVISIBLE (INFALIBLE) */}
+                    {/* ========================================================================= */}
+
+                    {/* FAKE UI PACIENTE */}
+                    <div className="relative group">
+                      <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
+                      <div className="w-full flex items-center justify-between py-2 border-b border-slate-400 group-hover:border-[#2563eb] transition-colors">
+                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteSeleccionado ? 'text-blue-900 italic' : 'text-slate-400'}`}>
+                          {pacienteSeleccionado ? `${pacienteSeleccionado.nombres} ${pacienteSeleccionado.apellidos}` : '(Clic para buscar...)'}
+                        </span>
+                        <ChevronDown size={16} className="shrink-0 text-slate-500 group-hover:text-[#2563eb] transition-colors" />
+                      </div>
+                      
+                      {/* EL VERDADERO SELECT (INVISIBLE) */}
+                      <select 
+                        name="id_paciente"
+                        value={triajeData.id_paciente}
+                        onChange={handleInputChange}
+                        className="absolute bottom-0 left-0 w-full h-10 opacity-0 cursor-pointer"
+                        required
+                      >
+                        <option value="" disabled>Seleccionar paciente...</option>
+                        {listaPacientes.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombres} {p.apellidos} - C.I: {p.cedula}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* FAKE UI MÉDICO */}
+                    <div className="relative group">
+                      <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
+                      <div className="w-full flex items-center justify-between py-2 border-b border-slate-400 group-hover:border-[#2563eb] transition-colors">
+                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoSeleccionado ? 'text-blue-900 italic' : 'text-slate-400'}`}>
+                          {medicoSeleccionado ? `Dr(a). ${medicoSeleccionado.nombres} ${medicoSeleccionado.apellidos}` : '(Clic para asignar...)'}
+                        </span>
+                        <ChevronDown size={16} className="shrink-0 text-slate-500 group-hover:text-[#2563eb] transition-colors" />
+                      </div>
+                      
+                      {/* EL VERDADERO SELECT (INVISIBLE) */}
+                      <select 
+                        name="id_medico"
+                        value={triajeData.id_medico}
+                        onChange={handleInputChange}
+                        className="absolute bottom-0 left-0 w-full h-10 opacity-0 cursor-pointer"
+                        required
+                      >
+                        <option value="" disabled>Seleccionar médico...</option>
+                        {listaMedicos.map(m => (
+                          <option key={m.id_auth || m.id} value={m.id_auth || m.id}>
+                            Dr(a). {m.nombres} {m.apellidos} - {m.especialidad || 'Especialista'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 relative z-10">
+                    <div className="mb-4 border-b border-slate-400 pb-1">
+                      <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                        1.- Examen Funcional / Síntomas Rápidos
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3 pl-2">
+                      {listaSintomasIVSS.map((sintoma) => (
+                        <label key={sintoma.id} className="flex items-center gap-3 cursor-pointer group">
+                          <div className="relative flex items-center justify-center w-5 h-5 border border-slate-500 bg-white group-hover:border-slate-800 transition-colors">
+                            <input 
+                              type="checkbox" 
+                              className="opacity-0 absolute"
+                              checked={triajeData.sintomasRapidos.includes(sintoma.label)}
+                              onChange={() => handleCheckboxChange(sintoma.label)}
+                            />
+                            {triajeData.sintomasRapidos.includes(sintoma.label) && (
+                              <span className="text-blue-900 font-serif font-black text-sm leading-none select-none italic">X</span>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-slate-700 select-none group-hover:text-slate-900 uppercase tracking-wide">
+                            <span className="text-slate-400 mr-2">{sintoma.id}.</span> {sintoma.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 relative z-10">
+                    <div className="mb-4 border-b border-slate-400 pb-1">
+                      <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                        2.- Signos Vitales
+                      </h3>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-8 gap-y-5 text-xs font-bold uppercase tracking-widest text-slate-700 pl-2">
+                      <div className="flex items-end gap-2">
+                        <span>Tensión (TA):</span>
+                        <input type="text" name="ta" value={triajeData.ta} onChange={handleInputChange} className="w-24 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ / ___" />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <span>Frecuencia (FC):</span>
+                        <input type="text" name="fc" value={triajeData.fc} onChange={handleInputChange} className="w-20 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ lpm" />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <span>Peso:</span>
+                        <input type="number" name="peso" value={triajeData.peso} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ kg" />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <span>Talla:</span>
+                        <input type="number" step="0.01" name="talla" value={triajeData.talla} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ m" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 relative z-10">
+                    <div className="mb-4 border-b border-slate-400 pb-1">
+                      <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                        3.- Motivo de la Consulta / Notas
+                      </h3>
+                    </div>
+                    
+                    <textarea 
+                      name="motivo" 
+                      value={triajeData.motivo} 
+                      onChange={handleInputChange} 
+                      required
+                      className="w-full bg-transparent border-0 outline-none text-blue-900 font-serif italic text-sm leading-[31px] resize-none min-h-[160px]"
+                      style={{
+                        backgroundImage: 'repeating-linear-gradient(transparent, transparent 30px, #cbd5e1 30px, #cbd5e1 31px)',
+                        backgroundAttachment: 'local',
+                        lineHeight: '31px',
+                        paddingTop: '2px'
+                      }}
+                    ></textarea>
+                  </div>
+
+                </form>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end relative z-10 pb-10">
+              <button 
+                type="button"
+                onClick={handleGuardarTriaje}
+                disabled={guardando || !triajeData.id_paciente || !triajeData.id_medico} 
+                className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 flex justify-center items-center gap-2 transition-all transform hover:-translate-y-1 disabled:hover:translate-y-0"
+              >
+                {guardando ? 'Procesando...' : <><FileText size={20} /> Guardar Historia y Remitir</>}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </main>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-5px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}

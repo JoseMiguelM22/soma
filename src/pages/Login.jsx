@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { ArrowLeft, CheckCircle, XCircle, Eye, EyeOff, Activity } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Eye, EyeOff, Activity, ChevronDown } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,6 +12,9 @@ export default function Login() {
   
   // Controla ver/ocultar contraseña
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Estado para el menú desplegable de ROL
+  const [rolSeleccionado, setRolSeleccionado] = useState('especialista');
   
   // Estados para los loaders
   const [showMainLoader, setShowMainLoader] = useState(true);
@@ -50,7 +53,7 @@ export default function Login() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Función unificada
+  // Función unificada con lógica de Roles
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -70,15 +73,43 @@ export default function Login() {
       }
     } else {
       try {
+        // 1. Auth con Supabase
         const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.correo,
           password: formData.contrasena,
         });
         if (error) throw error;
-        setAlert({ show: true, type: 'success', message: '¡Bienvenido de vuelta, Doctor!' });
-        setTimeout(() => navigate('/dashboard'), 1000);
+
+        // 2. Buscar el rol en BD
+        const { data: dbUser, error: userError } = await supabase
+          .from('usuarios')
+          .select('rol')
+          .eq('id_auth', data.user.id)
+          .single();
+
+        if (userError) throw userError;
+
+        // 3. Validar Seguridad de Roles
+        if (dbUser.rol !== rolSeleccionado) {
+          await supabase.auth.signOut(); // Destruimos sesión si miente
+          throw new Error(`Acceso denegado: Tu cuenta no es de ${rolSeleccionado === 'especialista' ? 'Médico Especialista' : 'Asistente (Admisión)'}.`);
+        }
+
+        // 4. Éxito y redirección según rol
+        setAlert({ show: true, type: 'success', message: '¡Bienvenido de vuelta a SOMA!' });
+        
+        if (dbUser.rol === 'departamento') {
+          setTimeout(() => navigate('/admision'), 1000);
+        } else {
+          setTimeout(() => navigate('/dashboard'), 1000);
+        }
+
       } catch (error) {
-        setAlert({ show: true, type: 'error', message: 'Credenciales incorrectas. Verifica tu correo y contraseña.' });
+        setAlert({ 
+          show: true, 
+          type: 'error', 
+          message: error.message.includes('Acceso denegado') ? error.message : 'Credenciales incorrectas. Verifica tu correo y contraseña.' 
+        });
       } finally {
         setLoading(false);
       }
@@ -95,7 +126,7 @@ export default function Login() {
   {alert.show && (
     <div className="fixed top-5 left-0 right-0 flex justify-center z-50">
       <div
-        className={`px-5 py-3 rounded-xl shadow-lg text-white text-sm font-bold tracking-wide ${
+        className={`px-5 py-3 rounded-xl shadow-lg text-white text-sm font-bold tracking-wide animate-[fadeIn_0.3s_ease-out] ${
           alert.type === "success"
             ? "bg-green-500"
             : "bg-red-500"
@@ -164,18 +195,12 @@ export default function Login() {
 
           {/* Logo móvil */}
           <div className="lg:hidden flex justify-center mb-10">
-             {/* Modo Claro (Logo Negro) 
-                 <img src="/soma_logo.png" alt="SOMA Logo" className="h-15 object-contain block dark:hidden transition-opacity duration-300" /> */}
-
                   {/* Modo Oscuro (Logo Blanco) */}
                   <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-15 object-contain dark:block transition-opacity duration-300" />
           </div>
 
           {/* Logo escritorio */}
           <div className="hidden lg:block text-center">
-             {/* Modo Claro (Logo Negro) 
-                 <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-8 object-contain block dark:hidden transition-opacity duration-300" /> */}
-
                   {/* Modo Oscuro (Logo Blanco) */}
                   <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-11 mx-auto mb-8 object-contain dark:block transition-opacity duration-300" />
           </div>
@@ -197,6 +222,47 @@ export default function Login() {
             onSubmit={handleSubmit}
             className="space-y-5"
           >
+
+            {/* 1. DESPLEGABLE DE ROL (NUEVO) */}
+            {!isResettingPassword && (
+              <div>
+                <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
+                  Perfil de Acceso
+                </label>
+                <div className="relative">
+                  <select
+                    value={rolSeleccionado}
+                    onChange={(e) => setRolSeleccionado(e.target.value)}
+                    className="
+                      w-full
+                      py-3
+                      px-4
+                      rounded-xl
+                      bg-white
+                      text-sm
+                      font-bold
+                      text-gray-900
+                      outline-none
+                      border
+                      border-transparent
+                      focus:border-[#8B5CF6]
+                      focus:ring-2
+                      focus:ring-[#8B5CF6]/30
+                      transition-all
+                      duration-300
+                      appearance-none
+                      cursor-pointer
+                    "
+                  >
+                    <option value="especialista">Médico Especialista</option>
+                    <option value="departamento">Asistente (Admisión)</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
+                    <ChevronDown size={18} />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* EMAIL */}
             <div>
@@ -310,7 +376,7 @@ export default function Login() {
             >
               {loading
                 ? "Procesando..."
-                : "Iniciar Sesión"}
+                : isResettingPassword ? "Recuperar Contraseña" : "Iniciar Sesión"}
             </button>
 
           </form>

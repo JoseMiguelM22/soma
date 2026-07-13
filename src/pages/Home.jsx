@@ -71,28 +71,25 @@ export default function Home() {
           BARRA MARQUEE (CINTA VERDE ANIMADA)
           ========================================== */}
       <div className="bg-[#b0ff4c] py-3 overflow-hidden flex whitespace-nowrap relative z-20 border-y-2 border-black">
-  <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
-    {/* Creamos un contenedor que se repetirá para llenar el ancho */}
-    <div className="flex items-center animate-scroll">
-      {[...Array(100)].map((_, i) => (
-        <React.Fragment key={i}>
-          {/* Logo Negro (Modo Claro) */}
-          <img 
-            src="/soma_logo.png" 
-            alt="SOMA" 
-            className="mx-8 h-8 object-contain block dark:hidden" 
-          />
-          {/* Logo Blanco (Modo Oscuro) */}
-          <img 
-            src="/soma_logo_blanco.png" 
-            alt="SOMA" 
-            className="mx-8 h-8 object-contain hidden dark:block" 
-          />
-        </React.Fragment>
-      ))}
-    </div>
-  </div>
-</div>
+        <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
+          <div className="flex items-center animate-scroll">
+            {[...Array(100)].map((_, i) => (
+              <React.Fragment key={i}>
+                <img 
+                  src="/soma_logo.png" 
+                  alt="SOMA" 
+                  className="mx-8 h-8 object-contain block dark:hidden" 
+                />
+                <img 
+                  src="/soma_logo_blanco.png" 
+                  alt="SOMA" 
+                  className="mx-8 h-8 object-contain hidden dark:block" 
+                />
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ==========================================
           SECCIÓN 2: GESTIÓN ALTAMENTE EFICIENTE (Oscura)
@@ -100,14 +97,12 @@ export default function Home() {
       <section className="bg-[#121212] py-24 md:py-32 relative overflow-hidden px-6">
         <div className="max-w-6xl mx-auto relative z-10 flex flex-col items-center text-center">
           
-          {/* Elementos Decorativos (Mascotas y Formas) */}
           <img src="/ruta-mascota-doctor-izq.svg" alt="Doctor" className="hidden md:block absolute -left-10 top-0 w-48 animate-float-slow" />
           <img src="/ruta-mascota-doctora-der.svg" alt="Doctora" className="hidden md:block absolute -right-10 bottom-0 w-48 animate-float-delayed" />
-          <img src="/ruta-icono-cruz-blanca.png" alt="Cruz" className="absolute right-[15%] top-10 w-24 opacity-80" />
-          <img src="/ruta-asterisco-verde.png" alt="Asterisco" className="absolute right-[10%] bottom-20 w-12" />
+          <img src="#" alt="" className="absolute right-[15%] top-10 w-24 opacity-80" />
+          <img src="/ruta-asterisco-verde.png" alt="" className="absolute right-[10%] bottom-20 w-12" />
           <img src="/ruta-destello-verde.png" alt="Destello" className="absolute left-[10%] top-40 w-12" />
 
-          {/* TITULAR PRINCIPAL */}
           <h2 className="text-[40px] md:text-[60px] lg:text-[76px] font-black text-white uppercase leading-[1.05] tracking-tight max-w-4xl">
             Disfruta una <span className="relative inline-block whitespace-nowrap z-10">
               GESTIÓN
@@ -130,9 +125,11 @@ export default function Home() {
       {/* ==========================================
           SECCIÓN 3: OPTIMIZA TU TIEMPO (Verde Lima)
           ========================================== */}
-      <section className="bg-[#b0ff4c] rounded-t-[3rem] md:rounded-t-[5rem] py-20 md:py-32 px-6 relative z-20 -mt-10 overflow-hidden shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+      {/* SECCIÓN SIN OVERFLOW-HIDDEN para permitir a la tablet flotar hacia arriba */}
+      <section className="bg-[#b0ff4c] rounded-t-[3rem] md:rounded-t-[5rem] py-20 md:py-32 px-6 relative z-20 -mt-10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
         
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_black_2px,_transparent_2px)] [background-size:30px_30px] pointer-events-none"></div>
+        {/* Fondo de puntitos con overflow-hidden para que no se salga de las curvas */}
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_black_2px,_transparent_2px)] [background-size:30px_30px] pointer-events-none overflow-hidden rounded-t-[3rem] md:rounded-t-[5rem]"></div>
 
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 relative z-10">
           
@@ -143,23 +140,26 @@ export default function Home() {
               y garantiza la seguridad
             </h2>
             
-            
-           <button className="hidden lg:inline-flex mt-12 bg-[#8b5cf6] hover:bg-[#7c4dff] text-white px-8 py-4 rounded-xl text-sm font-bold tracking-widest items-center gap-3 transition-transform hover:-translate-y-1 shadow-xl">
+            <button className="hidden lg:inline-flex mt-12 bg-[#8b5cf6] hover:bg-[#7c4dff] text-white px-8 py-4 rounded-xl text-sm font-bold tracking-widest items-center gap-3 transition-transform hover:-translate-y-1 shadow-xl">
               COMIENZA TU CONSULTA <ArrowUpRight size={20} />
-              
             </button>
           </div>
 
-          <div className="flex-1 relative w-full h-[400px] md:h-[500px]">
+          {/* ==========================================
+              CONTENEDOR DE LAPTOPS CORREGIDO AL FIGMA
+              ========================================== */}
+          <div className="flex-1 relative w-full h-[350px] sm:h-[450px] lg:h-[600px] mt-12 lg:mt-0 pointer-events-none">
+            {/* Tablet (Detrás, Arriba-Izquierda rompiendo el techo) */}
             <img 
               src="/soma_tablet.svg" 
               alt="SOMA on Tablet" 
-              className="absolute left-0 lg:-left-10 top-0 w-3/4 md:w-[80%] max-w-[500px] drop-shadow-2xl z-10 animate-float"
+              className="absolute -top-16 md:-top-24 lg:-top-32 left-0 md:-left-8 lg:-left-12 w-[80%] md:w-[75%] lg:w-[85%] max-w-[550px] drop-shadow-2xl z-10 animate-float-slow"
             />
+            {/* Laptop (Frente, Abajo-Derecha expandida) */}
             <img 
               src="/soma_laptop.svg" 
               alt="SOMA on Laptop" 
-              className="absolute right-0 lg:-right-10 bottom-0 w-4/5 md:w-[85%] max-w-[600px] drop-shadow-[0_30px_30px_rgba(0,0,0,0.3)] z-20 animate-float-delayed"
+              className="absolute bottom-0 md:-bottom-10 lg:-bottom-12 right-0 md:-right-10 lg:-right-20 w-[95%] md:w-[90%] lg:w-[110%] max-w-[750px] drop-shadow-[0_40px_50px_rgba(0,0,0,0.5)] z-20 animate-float"
             />
           </div>
 
@@ -180,8 +180,6 @@ export default function Home() {
               Digitaliza tu consulta en 3 pasos
             </h2>
             <div className="text-white/30 text-2xl font-black tracking-widest flex items-center gap-2">
-               
-                  {/* Modo Oscuro (Logo Blanco) */}
                   <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-14 object-contain dark:block transition-opacity duration-300" />
             </div>
           </div>
@@ -234,7 +232,6 @@ export default function Home() {
       <section className="bg-[#121212] py-24 md:py-32 px-6 relative z-30">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-16">
           
-          {/* Lado Izquierdo: Texto Principal */}
           <div className="flex-1 text-left w-full">
             <h2 className="text-[40px] md:text-6xl lg:text-[72px] font-black uppercase leading-[1.05] tracking-tight text-white">
               CREAMOS<br />
@@ -246,17 +243,12 @@ export default function Home() {
             </h2>
           </div>
 
-          {/* Lado Derecho: Logo y Estadísticas */}
           <div className="flex-1 flex flex-col items-center lg:items-end w-full relative">
-            
-            {/* Logo Abstracto (Usa tu logo blanco de SOMA) */}
             <div className="mb-12 lg:mb-20">
               <img src="/soma_logo_blanco.png" alt="SOMA Logo Abstract" className="w-24 md:w-32 object-contain" />
             </div>
             
-            {/* Contenedor de Estadísticas con línea decorativa */}
             <div className="relative w-full lg:w-auto text-center lg:text-right border-t border-white/10 pt-8 lg:pt-0 lg:border-t-0 lg:border-l lg:pl-10">
-              {/* Decoración de la línea al estilo del Figma */}
               <div className="hidden lg:block absolute -top-8 -left-[1px] w-2 h-2 bg-[#b0ff4c] rounded-full"></div>
               
               <h3 className="text-5xl md:text-6xl font-black text-white leading-none">
@@ -270,7 +262,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Botón de Inicio */}
             <button className="mt-12 bg-[#b0ff4c] hover:bg-[#9ded3a] text-black px-8 py-3.5 rounded-full text-sm font-bold tracking-widest flex items-center justify-center gap-2 transition-transform hover:-translate-y-1 w-full sm:w-auto">
               INICIAR <ArrowUpRight size={20} />
             </button>
@@ -282,29 +273,26 @@ export default function Home() {
       {/* ==========================================
           BARRA MARQUEE 2 (CON ASTERISCOS)
           ========================================== */}
-   <div className="bg-[#b0ff4c] py-3 overflow-hidden flex whitespace-nowrap relative z-20 border-y-2 border-black">
-  <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
-    {/* Creamos un contenedor que se repetirá para llenar el ancho */}
-    <div className="flex items-center animate-scroll">
-      {[...Array(100)].map((_, i) => (
-        <React.Fragment key={i}>
-          {/* Logo Negro (Modo Claro) */}
-          <img 
-            src="/soma_logo.png" 
-            alt="SOMA" 
-            className="mx-8 h-8 object-contain block dark:hidden" 
-          />
-          {/* Logo Blanco (Modo Oscuro) */}
-          <img 
-            src="/soma_logo_blanco.png" 
-            alt="SOMA" 
-            className="mx-8 h-8 object-contain hidden dark:block" 
-          />
-        </React.Fragment>
-      ))}
-    </div>
-  </div>
-</div>
+      <div className="bg-[#b0ff4c] py-3 overflow-hidden flex whitespace-nowrap relative z-20 border-y-2 border-black">
+        <div className="animate-marquee font-black text-black text-2xl md:text-3xl tracking-widest flex items-center">
+          <div className="flex items-center animate-scroll">
+            {[...Array(100)].map((_, i) => (
+              <React.Fragment key={i}>
+                <img 
+                  src="/soma_logo.png" 
+                  alt="SOMA" 
+                  className="mx-8 h-8 object-contain block dark:hidden" 
+                />
+                <img 
+                  src="/soma_logo_blanco.png" 
+                  alt="SOMA" 
+                  className="mx-8 h-8 object-contain hidden dark:block" 
+                />
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ==========================================
           SECCIÓN 6: CREADORES
@@ -368,7 +356,6 @@ export default function Home() {
                 </span>
               </div>
               <div className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6">
-                {/* Nota: Apliqué un filtro grayscale para que se parezca a la imagen del tutor en el Figma */}
                 <img src="/gregory.jpg" alt="Gregory Cedetto" className="w-full h-full object-cover grayscale transition-transform duration-700 group-hover:scale-105 group-hover:grayscale-0" />
               </div>
               <div className="flex justify-between items-end mt-auto px-2">

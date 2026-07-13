@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, Settings, LogOut, 
-  Menu, Sun, Moon, UserPlus, FilePlus, CalendarPlus, Clock, PlayCircle, X, PanelLeft
+  Menu, Sun, Moon, UserPlus, FilePlus, CalendarPlus, Clock, PlayCircle, X, PanelLeft, Activity
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -45,12 +45,20 @@ export default function Dashboard() {
           .eq('id_auth', session.user.id)
           .single();
 
-        if (isMounted && dbUser) setUserData(dbUser);
-        if (isMounted) setLoadingUser(false);
-      } catch (error) {
-        if (isMounted) setLoadingUser(false);
+        if (isMounted && dbUser) {
+        // === NUEVAS LÍNEAS PARA EL ROL ===
+        if (dbUser.rol === 'departamento') {
+          navigate('/admision');
+          return; // Detiene la carga de este dashboard
+        }
+        // ==================================
+        setUserData(dbUser);
       }
-    };
+      if (isMounted) setLoadingUser(false);
+    } catch (error) {
+      if (isMounted) setLoadingUser(false);
+    }
+  };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) navigate('/login');
@@ -81,7 +89,7 @@ export default function Dashboard() {
   // Pantalla de Carga
   if (loadingUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0a]">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0B0D12]">
         <div className="flex flex-col items-center">
           <div className="w-16 h-16 border-4 border-cyan-100 dark:border-slate-800 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
           <p className="text-slate-500 dark:text-slate-400 font-bold animate-pulse">Cargando tu consultorio...</p>
@@ -155,7 +163,7 @@ export default function Dashboard() {
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
               </Link>
                <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Calendar size={20} className="shrink-0" />
+                <Activity size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadisticas</span>}
               </Link>
             </nav>
@@ -245,10 +253,19 @@ export default function Dashboard() {
                 <span className="text-xl">Crear Consulta</span>
               </Link>
               
-              <Link to="/agenda" className="flex items-center justify-center gap-3 p-20 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
-                <CalendarPlus size={28} />
-                <span className="text-xl">Agendar Cita</span>
-              </Link>
+              {/* Contenedor del Botón de Agenda y la Mascota */}
+              <div className="relative flex w-full h-full">
+                {/* Imagen Flotante Absoluta */}
+                <img 
+                  src="/ruta-mascota-doctora-der.svg" 
+                  alt="Doctora SOMA" 
+                  className="absolute bottom-full right-2 md:right-4 mb-4 w-20 md:w-28 z-20 pointer-events-none drop-shadow-2xl" 
+                />
+                <Link to="/agenda" className="w-full flex items-center justify-center gap-3 p-20 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
+                  <CalendarPlus size={28} />
+                  <span className="text-xl relative z-10">Agendar Cita</span>
+                </Link>
+              </div>
 
               
 
@@ -303,9 +320,10 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-                <div className="relative z-20 w-16 h-12 bg-rose-600 rounded-2xl flex items-center justify-center group-hover:bg-rose-500 transition-colors shadow-lg">
-                  <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                </div>
+                  <div 
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                    style={{ backgroundImage: "url('/CE.jpg')" }}
+                  ></div>
 
               </div>
             </div>

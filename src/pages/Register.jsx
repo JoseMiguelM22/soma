@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { ArrowLeft, CheckCircle, XCircle, Eye, EyeOff, Activity } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Eye, EyeOff, Activity, ChevronDown } from 'lucide-react';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -18,7 +18,9 @@ export default function Register() {
   // Alertas
   const [alert, setAlert] = useState({ show: false, type: '', message: '' });
 
+  // Agregamos 'rol' al formData (por defecto 'especialista')
   const [formData, setFormData] = useState({
+    rol: 'especialista', // Novedad: Control de rol
     especialidad: '', primer_nombre: '', primer_apellido: '',
     numero_identificacion: '', telefono: '', correo: '',
     contrasena: '', confirmar_contrasena: '', sexo: '',
@@ -104,6 +106,14 @@ export default function Register() {
       return;
     }
 
+    // Si es asistente, no necesita especialidad médica
+    const especialidadFinal = formData.rol === 'departamento' ? 'Admisión / Triaje' : formData.especialidad;
+
+    if (formData.rol === 'especialista' && !especialidadFinal) {
+      setAlert({ show: true, type: 'error', message: 'Por favor, selecciona una especialidad médica.' });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -113,12 +123,14 @@ export default function Register() {
 
       if (authError) throw authError;
 
+      // Inserción en la base de datos INCLUYENDO EL ROL
       const { error: dbError } = await supabase.from('usuarios').insert([{
         id_auth: authData.user.id,
+        rol: formData.rol, // ¡Aquí enviamos el rol seleccionado!
         nombres: formData.primer_nombre,
         apellidos: formData.primer_apellido,
         cedula: formData.numero_identificacion,
-        especialidad: formData.especialidad,
+        especialidad: especialidadFinal,
         correo: formData.correo,
         sexo: formData.sexo,
         pais: formData.pais,
@@ -228,20 +240,14 @@ export default function Register() {
           {/* FORMULARIO DE REGISTRO */}
           {/* Alineado hacia la derecha */}
           <div className="w-full lg:w-1/2 flex justify-end items-center">
-            {/* max-w-[480px] para dar espacio a los inputs dobles (ej. Nombre y Apellido) */}
             <div className="w-full max-w-[480px]">
 
               {/* Logo móvil */}
               <div className="lg:hidden flex justify-center mb-8">
-                <img src="/soma_logo.png" alt="SOMA Logo" className="h-12 object-contain block dark:hidden transition-opacity duration-300" />
                 <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-12 object-contain hidden dark:block transition-opacity duration-300" />
               </div>
 
-             
               <div className="hidden lg:block text-center">
-                 {/* Logo escritorio 
-                <img src="/soma_logo.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain block dark:hidden transition-opacity duration-300" /> */}
-
                 <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-10 mx-auto mb-6 object-contain dark:block transition-opacity duration-300" />
               </div>
 
@@ -256,22 +262,53 @@ export default function Register() {
 
               <form onSubmit={handleRegister} className="space-y-4">
                 
-                {/* Especialidad */}
+                {/* 1. SELECCIÓN DE ROL */}
                 <div>
                   <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
-                    Especialidad
+                    ¿Qué perfil deseas crear?
                   </label>
-                  <select 
-                    name="especialidad" 
-                    value={formData.especialidad} 
-                    onChange={handleChange} 
-                    required 
-                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300"
-                  >
-                    <option value="" className="text-gray-400">Seleccionar especialidad...</option>
-                    {especialidades.map(esp => <option key={esp} value={esp} className="text-gray-900">{esp}</option>)}
-                  </select>
+                  <div className="relative">
+                    <select 
+                      name="rol" 
+                      value={formData.rol} 
+                      onChange={handleChange} 
+                      required 
+                      className={`w-full appearance-none py-3 px-4 rounded-xl bg-white text-sm font-bold text-gray-900 outline-none border border-transparent transition-all duration-300 cursor-pointer
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `}
+                    >
+                      <option value="especialista">Médico Especialista</option>
+                      <option value="departamento">Asistente (Dpto. de Admisión)</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
+                      <ChevronDown size={18} />
+                    </div>
+                  </div>
                 </div>
+
+                {/* 2. Especialidad (SOLO SI ES MÉDICO) */}
+                {formData.rol === 'especialista' && (
+                  <div className="animate-[fadeIn_0.3s_ease-out]">
+                    <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
+                      Especialidad
+                    </label>
+                    <div className="relative">
+                      <select 
+                        name="especialidad" 
+                        value={formData.especialidad} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full appearance-none py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30 transition-all duration-300 cursor-pointer"
+                      >
+                        <option value="" className="text-gray-400">Seleccionar especialidad...</option>
+                        {especialidades.map(esp => <option key={esp} value={esp} className="text-gray-900">{esp}</option>)}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Nombre y Apellido */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -284,7 +321,9 @@ export default function Register() {
                       value={formData.primer_nombre} 
                       onChange={handleChange} 
                       required 
-                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      className={`w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent transition-all duration-300
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `} 
                       placeholder="Ej. José" 
                     />
                   </div>
@@ -297,7 +336,9 @@ export default function Register() {
                       value={formData.primer_apellido} 
                       onChange={handleChange} 
                       required 
-                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      className={`w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent transition-all duration-300
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `} 
                       placeholder="Ej. Medina" 
                     />
                   </div>
@@ -314,13 +355,17 @@ export default function Register() {
                       value={formData.numero_identificacion} 
                       onChange={handleChange} 
                       required 
-                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      className={`w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent transition-all duration-300
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `} 
                       placeholder="12345678" 
                     />
                   </div>
                   <div>
                     <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Teléfono</label>
-                    <div className="flex items-center w-full py-3 px-4 rounded-xl bg-white border border-transparent focus-within:border-[#8B5CF6] focus-within:ring-2 focus-within:ring-[#8B5CF6]/30 transition-all duration-300">
+                    <div className={`flex items-center w-full py-3 px-4 rounded-xl bg-white border border-transparent transition-all duration-300
+                      ${formData.rol === 'especialista' ? 'focus-within:border-[#b0ff4c] focus-within:ring-2 focus-within:ring-[#b0ff4c]/30' : 'focus-within:border-[#8B5CF6] focus-within:ring-2 focus-within:ring-[#8B5CF6]/30'}
+                    `}>
                       <img className="w-4 h-[11px] object-cover mr-2 rounded-sm" src="https://flagcdn.com/w20/ve.png" alt="VE" />
                       <span className="text-sm font-bold text-gray-500 mr-2">+58</span>
                       <input 
@@ -347,7 +392,9 @@ export default function Register() {
                     value={formData.correo} 
                     onChange={handleChange} 
                     required 
-                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                    className={`w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent transition-all duration-300
+                      ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                    `} 
                     placeholder="tu@correo.com" 
                   />
                 </div>
@@ -364,7 +411,9 @@ export default function Register() {
                       value={formData.contrasena} 
                       onChange={handleChange} 
                       required 
-                      className="w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      className={`w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent transition-all duration-300
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `} 
                       placeholder="••••••••" 
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-[36px] text-gray-400 hover:text-gray-700 transition-colors">
@@ -381,7 +430,9 @@ export default function Register() {
                       value={formData.confirmar_contrasena} 
                       onChange={handleChange} 
                       required 
-                      className="w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300" 
+                      className={`w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent transition-all duration-300
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `} 
                       placeholder="••••••••" 
                     />
                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-4 top-[36px] text-gray-400 hover:text-gray-700 transition-colors">
@@ -394,58 +445,85 @@ export default function Register() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Sexo</label>
-                    <select 
-                      name="sexo" 
-                      value={formData.sexo} 
-                      onChange={handleChange} 
-                      required 
-                      className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300"
-                    >
-                      <option value="" className="text-gray-400">Seleccionar...</option>
-                      <option value="Masculino">Masculino</option>
-                      <option value="Femenino">Femenino</option>
-                      <option value="Otro">Otro</option>
-                    </select>
+                    <div className="relative">
+                      <select 
+                        name="sexo" 
+                        value={formData.sexo} 
+                        onChange={handleChange} 
+                        required 
+                        className={`w-full appearance-none py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent transition-all duration-300 cursor-pointer
+                          ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                        `}
+                      >
+                        <option value="" className="text-gray-400">Seleccionar...</option>
+                        <option value="Masculino" className="text-gray-900">Masculino</option>
+                        <option value="Femenino" className="text-gray-900">Femenino</option>
+                        <option value="Otro" className="text-gray-900">Otro</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-gray-400 text-sm font-bold mb-2 tracking-wide">País</label>
-                    <select 
-                      name="pais" 
-                      disabled 
-                      className="w-full py-3 px-4 rounded-xl bg-white/10 text-sm font-semibold text-gray-400 outline-none border border-white/5 cursor-not-allowed"
-                    >
-                      <option value="Venezuela">Venezuela</option>
-                    </select>
+                    <div className="relative">
+                      <select 
+                        name="pais" 
+                        disabled 
+                        className="w-full appearance-none py-3 px-4 rounded-xl bg-white/10 text-sm font-semibold text-gray-400 outline-none border border-white/5 cursor-not-allowed"
+                      >
+                        <option value="Venezuela">Venezuela</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500 opacity-50">
+                        <ChevronDown size={18} />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Ciudad */}
                 <div>
                   <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">Ciudad</label>
-                  <select 
-                    name="ciudad" 
-                    value={formData.ciudad} 
-                    onChange={handleChange} 
-                    required 
-                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300 mb-2"
-                  >
-                    <option value="" className="text-gray-400">Seleccione una ciudad</option>
-                    {cities.map(c => <option key={c} value={c} className="text-gray-900">{c}</option>)}
-                  </select>
+                  <div className="relative mb-2">
+                    <select 
+                      name="ciudad" 
+                      value={formData.ciudad} 
+                      onChange={handleChange} 
+                      required 
+                      className={`w-full appearance-none py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 outline-none border border-transparent transition-all duration-300 cursor-pointer
+                        ${formData.rol === 'especialista' ? 'focus:border-[#b0ff4c] focus:ring-2 focus:ring-[#b0ff4c]/30' : 'focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30'}
+                      `}
+                    >
+                      <option value="" className="text-gray-400">Seleccione una ciudad</option>
+                      {cities.map(c => <option key={c} value={c} className="text-gray-900">{c}</option>)}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
+                      <ChevronDown size={18} />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Botón Principal */}
+                {/* Botón Principal Dinámico según Rol */}
                 <button 
                   type="submit" 
                   disabled={loading}
-                  className="w-full py-3 mt-6 rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-extrabold tracking-wide shadow-lg shadow-[#8B5CF6]/20 transition-all duration-300 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none flex justify-center items-center gap-2"
+                  className={`w-full py-3 mt-6 rounded-xl text-sm font-extrabold tracking-wide transition-all duration-300 transform flex justify-center items-center gap-2
+                    ${loading ? 'opacity-50 transform-none' : 'hover:-translate-y-0.5 shadow-lg'}
+                    ${formData.rol === 'especialista' 
+                      ? 'bg-[#b0ff4c] hover:bg-[#9ded3a] text-black shadow-[#b0ff4c]/20' 
+                      : 'bg-[#8B5CF6] hover:bg-[#7C3AED] text-white shadow-[#8B5CF6]/20'
+                    }
+                  `}
                 >
                   {loading ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div> 
                       Procesando...
                     </>
-                  ) : 'Crear cuenta'}
+                  ) : (
+                    formData.rol === 'especialista' ? 'Crear cuenta de Médico' : 'Crear cuenta de Asistente'
+                  )}
                 </button>
               </form>
 
@@ -472,6 +550,10 @@ export default function Register() {
       <style>{`
         @keyframes slideDownFade {
           0% { opacity: 0; transform: translateY(-20px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          0% { opacity: 0; transform: translateY(-10px); }
           100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>

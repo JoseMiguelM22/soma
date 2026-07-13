@@ -18,6 +18,7 @@ export default function Historias() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isListening, setIsListening] = useState(false); 
+  const [isModoFoco, setIsModoFoco] = useState(false); // Modo de visualización sin distracciones
   
   // ================= MODALES Y VISTAS =================
   const [isModalConsultaOpen, setIsModalConsultaOpen] = useState(false); 
@@ -137,16 +138,39 @@ export default function Historias() {
     </button>
   );
 
-  const insertarEnlace = (e) => {
-    e.preventDefault();
-    const url = prompt("Introduce el enlace:");
+  const insertarEnlace = () => {
+    const url = prompt("Introduce la URL del enlace clínico:");
     if (url) ejecutarComando("createLink", url);
   };
 
-  const insertarImagen = (e) => {
-    e.preventDefault();
-    const url = prompt("Introduce la URL de la imagen:");
+  const insertarImagen = () => {
+    const url = prompt("Introduce la URL del estudio o imagen médica:");
     if (url) ejecutarComando("insertImage", url);
+  };
+
+  const insertarTablaSignos = () => {
+    const tablaHTML = `
+      <table style="width:100%; border-collapse: collapse; margin: 15px 0; border: 1px solid #cbd5e1;">
+        <thead>
+          <tr style="background-color: #f1f5f9;">
+            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-weight: bold; color: #1e293b;">Signo Vital</th>
+            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-weight: bold; color: #1e293b;">Valor Medido</th>
+            <th style="border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-weight: bold; color: #1e293b;">Evaluación</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="border: 1px solid #cbd5e1; padding: 8px; color: #334155;">Presión Arterial (TA)</td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td></tr>
+          <tr><td style="border: 1px solid #cbd5e1; padding: 8px; color: #334155;">Frecuencia Cardíaca (FC)</td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td></tr>
+          <tr><td style="border: 1px solid #cbd5e1; padding: 8px; color: #334155;">Saturación de Oxígeno (SpO2)</td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td></tr>
+          <tr><td style="border: 1px solid #cbd5e1; padding: 8px; color: #334155;">Temperatura (°C)</td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td><td style="border: 1px solid #cbd5e1; padding: 8px;"></td></tr>
+        </tbody>
+      </table><br>
+    `;
+    ejecutarComando("insertHTML", tablaHTML);
+  };
+
+  const mostrarAyudaComandos = () => {
+    alert("Atajos Rápidos de SOMA Word:\n\n• Ctrl + B : Negrita\n• Ctrl + I : Cursiva\n• Ctrl + U : Subrayado\n\nTodos los módulos superiores interactúan directamente con el lienzo clínico.");
   };
 
   // ================= DICTADO POR VOZ CON IA =================
@@ -333,7 +357,7 @@ export default function Historias() {
   const consultasDelPaciente = pacienteSeleccionado ? consultas.filter(c => c.id_paciente === pacienteSeleccionado.id) : [];
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
+    <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
       
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
@@ -440,7 +464,7 @@ export default function Historias() {
       </aside>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#0B0D12]">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
         
         <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
@@ -454,9 +478,7 @@ export default function Historias() {
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           
-          {/* ========================================================
-              VISTA 1: LISTADO GLOBAL (AGRUPADO POR PACIENTE)
-              ======================================================== */}
+          {/* VISTA 1: LISTADO GLOBAL */}
           {!isModalConsultaOpen && !pacienteSeleccionado && (
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
@@ -657,8 +679,8 @@ export default function Historias() {
             <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden">
                 
-                {/* Cabecera Principal */}
-                {pacienteSeleccionado ? (
+                {/* Cabecera Principal - Se oculta si está activo el Modo Foco */}
+                {pacienteSeleccionado && !isModoFoco && (
                   <div className="bg-slate-100 dark:bg-[#161616] p-6 border-b border-slate-200 dark:border-white/5 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-700 font-bold text-lg shrink-0">
@@ -674,26 +696,13 @@ export default function Historias() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-6 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 block mb-2">Seleccionar Paciente *</label>
-                    <select 
-                      required 
-                      value={historiaData.id_paciente} 
-                      onChange={(e) => setHistoriaData({...historiaData, id_paciente: e.target.value})} 
-                      className="w-full max-w-md p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#111111] text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
-                    >
-                      <option value="">Buscar paciente...</option>
-                      {pacientesLista.map(p => (<option key={p.id} value={p.id}>{p.nombres} {p.apellidos} - {p.cedula}</option>))}
-                    </select>
-                  </div>
                 )}
 
                 {/* Sub-cabecera de Herramientas */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 gap-4">
                   <div>
                     <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
-                      {historiaData.id ? 'Edit Historia Evolutiva' : 'Nueva Historia Evolutiva'}
+                      {historiaData.id ? 'Editar Historia Evolutiva' : 'Nueva Historia Evolutiva'}
                     </h3>
                     <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
                       <span>Consulta <strong>{formatearFechaTexto(historiaData.fecha_consulta.split('T')[0])}</strong></span>
@@ -703,71 +712,63 @@ export default function Historias() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button className="hidden md:flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] shadow-sm transition-colors"><Maximize size={14} /> Modo Foco</button>
-                    <button onClick={() => setIsModalConsultaOpen(false)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] shadow-sm transition-colors"><X size={14} /> Cancelar</button>
+                    <button onClick={() => setIsModoFoco(!isModoFoco)} className={`hidden md:flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold shadow-sm transition-colors ${isModoFoco ? 'bg-cyan-100 border-cyan-300 text-cyan-700 dark:bg-cyan-900/30' : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a]'}`}><Maximize size={14} /> {isModoFoco ? 'Salir de Foco' : 'Modo Foco'}</button>
+                    <button onClick={() => { setIsModalConsultaOpen(false); setIsModoFoco(false); }} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] shadow-sm transition-colors"><X size={14} /> Cancelar</button>
                     <button onClick={handleGuardarHistoria} disabled={guardando || !historiaData.id_paciente} className="flex items-center gap-1.5 px-5 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md transition-colors disabled:opacity-50">
                       {guardando ? 'Guardando...' : <><Check size={14} /> Guardar</>}
                     </button>
                   </div>
                 </div>
 
-                {/* Sub-pestañas internas */}
-                <div className="flex px-6 border-b border-slate-200 dark:border-white/5 text-sm font-bold text-slate-500 dark:text-slate-400 gap-6">
-                  <button className="py-3 hover:text-slate-800 dark:hover:text-white transition-colors">Ver historia clínica</button>
-                  <button className="py-3 border-b-[3px] border-[#0081a7] dark:border-cyan-500 text-[#0081a7] dark:text-cyan-400">Historia clínica</button>
-                  <button className="py-3 hover:text-slate-800 dark:hover:text-white transition-colors">Compartir</button>
-                </div>
-
                 {/* Formulario de Historia */}
-                <div className="p-6 md:p-8 space-y-8 bg-slate-50/50 dark:bg-[#0a0a0a]/50">
+                <div className="p-6 md:p-8 space-y-6 bg-slate-50/50 dark:bg-[#0a0a0a]/50">
                   
-                  {/* Bloque 1: Fecha y Lugar */}
-                  <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
-                    <h4 className="font-bold text-slate-900 dark:text-white mb-6">Fecha y lugar de la consulta</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha de la consulta</label>
-                        <input 
-                          type="datetime-local" 
-                          value={historiaData.fecha_consulta} 
-                          onChange={(e) => setHistoriaData({...historiaData, fecha_consulta: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Próxima consulta <span className="font-normal text-slate-400">(opcional - agenda)</span></label>
-                        <input 
-                          type="datetime-local" 
-                          value={historiaData.proxima_consulta} 
-                          onChange={(e) => setHistoriaData({...historiaData, proxima_consulta: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Consultorio</label>
-                        <select 
-                          value={historiaData.consultorio} 
-                          onChange={(e) => setHistoriaData({...historiaData, consultorio: e.target.value})}
-                          className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
-                        >
-                          <option value="">Seleccione o escriba...</option>
-                          {listaConsultorios.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                  {/* Bloque 1: Fecha y Lugar - Se oculta en Modo Foco */}
+                  {!isModoFoco && (
+                    <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm animate-[fadeIn_0.2s_ease-out]">
+                      <h4 className="font-bold text-slate-900 dark:text-white mb-6">Fecha y lugar de la consulta</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha de la consulta</label>
+                          <input 
+                            type="datetime-local" 
+                            value={historiaData.fecha_consulta} 
+                            onChange={(e) => setHistoriaData({...historiaData, fecha_consulta: e.target.value})}
+                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Próxima consulta <span className="font-normal text-slate-400">(opcional)</span></label>
+                          <input 
+                            type="datetime-local" 
+                            value={historiaData.proxima_consulta} 
+                            onChange={(e) => setHistoriaData({...historiaData, proxima_consulta: e.target.value})}
+                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Consultorio</label>
+                          <select 
+                            value={historiaData.consultorio} 
+                            onChange={(e) => setHistoriaData({...historiaData, consultorio: e.target.value})}
+                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
+                          >
+                            <option value="">Seleccione o escriba...</option>
+                            {listaConsultorios.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Bloque 2: Nota Clínica (WYSIWYG PRO) */}
+                  {/* Bloque 2: Nota Clínica (WYSIWYG PRO TOTALMENTE OPERATIVO) */}
                   <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm">
                     
                     {/* Encabezado del Editor */}
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white">Nota clínica</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Contenido principal de la consulta.</p>
-                        <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-[#0081a7] dark:text-cyan-400 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors mt-3">
-                          <FileSignature size={14} /> Seleccionar Plantilla
-                        </button>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Evolución e historial enriquecido.</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <button 
@@ -792,59 +793,65 @@ export default function Historias() {
                     {/* Contenedor del Editor Exacto a la Foto */}
                     <div className="border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-[#111111]">
                       
-                      {/* Menú Texto Superior: Con interacciones */}
-                      <div className="hidden sm:flex items-center justify-between px-4 py-2 text-[11px] font-medium text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                        <div className="flex gap-4">
-                          <span onClick={descargarPDFHistoria} className="cursor-pointer hover:text-cyan-500">Archivo</span>
-                          <span onClick={() => ejecutarComando('undo')} className="cursor-pointer hover:text-cyan-500">Editar</span>
-                          <span onClick={() => alert('Modo Foco activado (Pulsa F11 para pantalla completa)')} className="cursor-pointer hover:text-cyan-500">Ver</span>
-                          <span onClick={insertarImagen} className="cursor-pointer hover:text-cyan-500">Insertar</span>
-                          <span onClick={() => ejecutarComando('removeFormat')} className="cursor-pointer hover:text-cyan-500">Formato</span>
-                          <span onClick={toggleDictado} className="cursor-pointer hover:text-cyan-500">Herramientas</span>
-                          <span onClick={() => alert('¡Próximamente: Inserción de tablas de signos vitales!')} className="cursor-pointer hover:text-cyan-500">Tabla</span>
-                          <span onClick={() => alert('Centro de Ayuda SOMA Cloud')} className="cursor-pointer hover:text-cyan-500">Ayuda</span>
+                      {/* Menú Texto Superior Realmente Funcional */}
+                      <div className="hidden sm:flex items-center justify-between px-4 py-2.5 text-[11px] font-bold text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                        <div className="flex gap-5">
+                          <span onClick={descargarPDFHistoria} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Archivo</span>
+                          <span onMouseDown={(e) => { e.preventDefault(); ejecutarComando('undo'); }} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Editar</span>
+                          <span onClick={() => setIsModoFoco(!isModoFoco)} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Ver</span>
+                          <span onMouseDown={(e) => { e.preventDefault(); insertarEnlace(); }} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Insertar</span>
+                          <span onMouseDown={(e) => { e.preventDefault(); ejecutarComando('removeFormat'); }} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Formato</span>
+                          <span onClick={toggleDictado} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Herramientas</span>
+                          <span onMouseDown={(e) => { e.preventDefault(); insertarTablaSignos(); }} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-emerald-600 dark:text-emerald-400 font-extrabold">+ Tabla Clínica</span>
+                          <span onClick={mostrarAyudaComandos} className="cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">Ayuda</span>
                         </div>
-                        <span className="flex items-center gap-1 text-orange-500 font-bold cursor-pointer hover:underline">
+                        <span className="flex items-center gap-1 text-orange-500 font-black cursor-pointer hover:underline">
                           <Zap size={12} /> Upgrade
                         </span>
                       </div>
                       
-                      {/* Barra de Herramientas (Los botones de iconos) */}
+                      {/* Barra de Herramientas de Iconos */}
                       <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
                         <BotonHerramienta icon={Undo} comando="undo" title="Deshacer" />
                         <BotonHerramienta icon={Redo} comando="redo" title="Rehacer" />
                         <BotonHerramienta icon={Paintbrush} comando="removeFormat" title="Limpiar Formato" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <select onChange={(e) => { e.preventDefault(); ejecutarComando('formatBlock', e.target.value); }} className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option value="P">Párrafo</option><option value="H1">Título 1</option><option value="H2">Título 2</option></select>
+                        
+                        <select onChange={(e) => { e.preventDefault(); ejecutarComando('formatBlock', e.target.value); }} className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-bold"><option value="P">Párrafo</option><option value="H1">Título 1</option><option value="H2">Título 2</option></select>
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <select onChange={(e) => { e.preventDefault(); ejecutarComando('fontSize', e.target.value); }} className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer"><option value="3">12pt</option><option value="4">14pt</option><option value="5">18pt</option></select>
+                        
+                        <select onChange={(e) => { e.preventDefault(); ejecutarComando('fontSize', e.target.value); }} className="text-xs bg-transparent border-none text-slate-700 dark:text-slate-300 outline-none cursor-pointer font-bold"><option value="3">12pt</option><option value="4">14pt</option><option value="5">18pt</option></select>
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        
                         <BotonHerramienta icon={Bold} comando="bold" className="text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30" title="Negrita" />
                         <BotonHerramienta icon={Italic} comando="italic" title="Cursiva" />
                         <BotonHerramienta icon={Underline} comando="underline" title="Subrayado" />
                         <BotonHerramienta icon={Strikethrough} comando="strikeThrough" title="Tachado" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        
                         <BotonHerramienta icon={AlignLeft} comando="justifyLeft" title="Alinear Izquierda" />
                         <BotonHerramienta icon={AlignCenter} comando="justifyCenter" title="Centrar" />
                         <BotonHerramienta icon={AlignRight} comando="justifyRight" title="Alinear Derecha" />
                         <BotonHerramienta icon={AlignJustify} comando="justifyFull" title="Justificar" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                        
                         <BotonHerramienta icon={List} comando="insertUnorderedList" title="Viñetas" />
                         <BotonHerramienta icon={ListOrdered} comando="insertOrderedList" title="Numeración" />
                         <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                        <button type="button" onMouseDown={insertarEnlace} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Enlace"><LinkIcon size={14} /></button>
-                        <button type="button" onMouseDown={insertarImagen} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Imagen"><ImageIcon size={14} /></button>
-                        <BotonHerramienta icon={Type} comando="removeFormat" className="border-b-2 border-black dark:border-white" title="Texto" />
+                        
+                        <button type="button" onMouseDown={(e) => { e.preventDefault(); insertarEnlace(); }} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Enlace"><LinkIcon size={14} /></button>
+                        <button type="button" onMouseDown={(e) => { e.preventDefault(); insertarImagen(); }} className="p-1.5 text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded" title="Imagen"><ImageIcon size={14} /></button>
+                        <BotonHerramienta icon={Type} comando="removeFormat" className="border-b-2 border-black dark:border-white" title="Limpiar Estilos" />
                       </div>
 
-                      {/* Área de Texto Editable */}
+                      {/* Área de Texto Enriquecido Editable (Tipografía de Alta Legibilidad) */}
                       <div 
                         id="editorClinico"
                         ref={notaRef}
                         contentEditable
                         suppressContentEditableWarning
                         onInput={(e) => setHistoriaData({...historiaData, nota_clinica: e.currentTarget.innerHTML})}
-                        className="w-full min-h-[400px] p-6 text-[15px] font-medium text-slate-900 dark:text-white bg-white dark:bg-[#111111] outline-none overflow-y-auto custom-scrollbar leading-relaxed cursor-text"
+                        className="w-full min-h-[450px] p-8 text-[15px] font-normal tracking-normal text-slate-900 dark:text-slate-100 bg-white dark:bg-[#111111] outline-none overflow-y-auto custom-scrollbar leading-relaxed cursor-text antialiased"
                       ></div>
                     </div>
                   </div>

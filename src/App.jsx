@@ -9,6 +9,7 @@ import Historias from './pages/Historias';
 import Agendas from './pages/Agendas';
 import Estadisticas from './pages/Estadisticas';
 import Perfil from './pages/Perfil';
+import DashboardAdmision from './pages/DashboardAdmision';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
       <Route path="/agenda" element={<Agendas />} />
       <Route path="/estadisticas" element={<Estadisticas />} />
       <Route path="/perfil" element={<Perfil />} />
+      <Route path="/admision" element={<DashboardAdmision />} />
      
     </Routes>
   )
