@@ -22,23 +22,26 @@ export default function Home() {
     <div className="min-h-screen bg-[#121212] font-sans overflow-x-hidden selection:bg-[#b0ff4c] selection:text-black relative">
       
       {/* ========================================================================= */}
-      {/* MODAL REPRODUCTOR DE VIDEO (Aparece cuando le das clic a la foto) */}
+      {/* MODAL REPRODUCTOR DE VIDEO (Elegante, difuminado y con líneas verdes) */}
       {/* ========================================================================= */}
       {activeVideo && (
-        <div className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/90 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]">
+        <div className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/80 backdrop-blur-xl animate-[fadeIn_0.3s_ease-out]">
+          
+          {/* Botón de Cerrar */}
           <button 
             onClick={() => setActiveVideo(null)}
-            className="absolute top-6 right-6 md:top-10 md:right-10 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 p-3 md:p-4 rounded-full transition-all z-50"
+            className="absolute top-6 right-6 md:top-10 md:right-10 text-[#b0ff4c] hover:text-black bg-white/10 hover:bg-[#b0ff4c] p-3 md:p-4 rounded-full transition-all z-50"
           >
             <X size={24} />
           </button>
           
-          <div className="w-full max-w-4xl p-4 md:p-8 animate-[float_0.3s_ease-out]">
+          {/* Contenedor del Video en Grande */}
+          <div className="w-full max-w-5xl p-4 md:p-8 animate-[zoomIn_0.3s_ease-out]">
             <video 
               src={activeVideo} 
               controls 
               autoPlay 
-              className="w-full h-auto max-h-[80vh] rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 bg-black"
+              className="w-full h-auto max-h-[85vh] rounded-[1.5rem] md:rounded-[2rem] shadow-[0_0_60px_rgba(176,255,76,0.3)] border-2 border-[#b0ff4c] bg-black outline-none"
             />
           </div>
         </div>
@@ -62,20 +65,22 @@ export default function Home() {
         <div className="absolute inset-0 bg-[#0F1312]/60"></div>
 
         {/* NAVBAR FLOTANTE */}
-        <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-[#1c1c1c]/60 backdrop-blur-md border border-white/10 rounded-full px-2 py-2 flex items-center justify-between z-50 shadow-2xl">
-          <button className="text-white/80 hover:text-white text-sm font-medium px-4 py-2 flex items-center gap-2">
-            Menu
-          </button>
+        <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-[#1c1c1c]/60 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center justify-between z-50 shadow-2xl">
           
-          <Link to="/" className="text-white font-black text-2xl tracking-widest absolute left-1/2 -translate-x-1/2">
-            SOMA
+          {/* Espaciador invisible para mantener el balance centrado del logo */}
+          <div className="w-20 hidden sm:block"></div> 
+
+          {/* LOGO REAL DE SOMA CENTRADO */}
+          <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+            <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-5 sm:h-6 object-contain hover:scale-105 transition-transform" />
           </Link>
 
-          <div className="flex items-center gap-2">
-            <Link to="/login" className="text-white/80 hover:text-white text-sm font-medium px-4 py-2 hidden sm:block">
+          {/* BOTONES DERECHOS */}
+          <div className="flex items-center gap-2 ml-auto">
+            <Link to="/login" className="text-white/80 hover:text-white text-sm font-medium px-4 py-2 hidden sm:block transition-colors">
               Acceso
             </Link>
-            <Link to="/register" className="bg-[#b0ff4c] hover:bg-[#9ded3a] text-black text-sm font-bold px-6 py-2.5 rounded-full transition-transform hover:scale-105">
+            <Link to="/register" className="bg-[#b0ff4c] hover:bg-[#9ded3a] text-black text-sm font-bold px-6 py-2.5 rounded-full transition-transform hover:scale-105 shadow-lg shadow-[#b0ff4c]/20">
               Unirse
             </Link>
           </div>
@@ -158,18 +163,14 @@ export default function Home() {
       {/* ==========================================
           SECCIÓN 3: OPTIMIZA TU TIEMPO (Verde Lima con Laptops)
           ========================================== */}
-      <section className="bg-[#b0ff4c] rounded-t-[3rem] md:rounded-t-[5rem] py-16 md:py-32 px-4 sm:px-8 relative z-20 -mt-10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] overflow-hidden">
+      <section className="bg-[#b0ff4c] rounded-t-[3rem] md:rounded-t-[5rem] py-16 md:py-32 px-6 sm:px-8 relative z-20 -mt-10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] overflow-hidden lg:overflow-visible">
         
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_black_2px,_transparent_2px)] [background-size:30px_30px] pointer-events-none"></div>
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_black_2px,_transparent_2px)] [background-size:30px_30px] pointer-events-none rounded-t-[3rem] md:rounded-t-[5rem]"></div>
 
-        <div className="max-w-7xl mx-auto relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-center gap-0 lg:gap-16 relative z-10">
 
-          {/* ========================================================================= */}
-          {/* VISTA MÓVIL Y TABLET: TEXTO E IMÁGENES AL LADO (DIVIDIDO EN 2 COLUMNAS) */}
-          {/* ========================================================================= */}
+          {/* VISTA MÓVIL Y TABLET */}
           <div className="flex flex-row items-center justify-between w-full lg:hidden gap-2 sm:gap-6 mt-4">
-            
-            {/* Columna Izquierda: TEXTO (60% del ancho) */}
             <div className="w-[55%] min-[400px]:w-[60%] text-left z-20 pl-2">
               <h2 className="text-[18px] min-[375px]:text-[22px] sm:text-4xl font-black uppercase leading-[1.15] tracking-tight text-black">
                 Optimiza tu tiempo,* <br/>
@@ -177,8 +178,6 @@ export default function Home() {
                 y garantiza la seguridad
               </h2>
             </div>
-
-            {/* Columna Derecha: IMÁGENES (40% del ancho) */}
             <div className="w-[45%] min-[400px]:w-[40%] relative h-[180px] sm:h-[250px] flex items-center justify-center z-10 pointer-events-none">
               <img 
                 src="/soma_tablet.svg" 
@@ -191,21 +190,16 @@ export default function Home() {
                 className="absolute bottom-4 right-0 w-[95%] sm:w-[85%] drop-shadow-[0_20px_25px_rgba(0,0,0,0.5)] animate-float"
               />
             </div>
-
           </div>
 
-          {/* BOTÓN (SOLO EN MÓVILES, ABAJO DEL TODO CON ESPACIO SEGURO) */}
           <div className="w-full lg:hidden z-30 mt-10 mb-4 px-2">
             <Link to="/register" className="w-full max-w-sm bg-[#8b5cf6] hover:bg-[#7c4dff] text-white px-8 py-4 rounded-xl text-sm font-bold tracking-widest flex items-center justify-center gap-3 shadow-xl mx-auto transition-transform hover:-translate-y-1 relative">
               COMIENZA TU CONSULTA <ArrowUpRight size={20} />
             </Link>
           </div>
 
-          {/* ========================================================================= */}
-          {/* VISTA LAPTOP / DESKTOP (DISEÑO ORIGINAL GIGANTE) */}
-          {/* ========================================================================= */}
+          {/* VISTA LAPTOP / DESKTOP */}
           <div className="hidden lg:flex flex-row items-center justify-center gap-16 w-full">
-            
             <div className="flex-1 text-black text-left z-20 relative w-full flex-col items-start">
               <h2 className="text-[56px] font-black uppercase leading-[1.15] tracking-tight">
                 Optimiza tu tiempo,* <br/>
@@ -216,7 +210,6 @@ export default function Home() {
                 COMIENZA TU CONSULTA <ArrowUpRight size={20} />
               </Link>
             </div>
-
             <div className="flex-1 relative w-full h-[600px] items-center justify-center pointer-events-none">
               <img 
                 src="/soma_tablet.svg" 
@@ -229,7 +222,6 @@ export default function Home() {
                 className="absolute -bottom-12 -right-20 w-[110%] max-w-[750px] drop-shadow-[0_40px_50px_rgba(0,0,0,0.6)] z-20 animate-float"
               />
             </div>
-            
           </div>
 
         </div>
@@ -367,15 +359,15 @@ export default function Home() {
             
             {/* CREADOR 1: Miguel */}
             <div className="bg-gradient-to-b from-[#2a2a2a] to-[#222] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
-              <div className="w-full flex justify-center mb-4">
+              <div className="w-full flex justify-center mb-4 text-center">
                 <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] border border-white/10 px-4 py-1.5 rounded-full">
-                  Diseñador UI/UX
+                  Cofundador - Diseñador UX - UI
                 </span>
               </div>
               
               <div 
                 onClick={() => setActiveVideo('/miguel_video.mp4')} 
-                className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video"
+                className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video border border-transparent hover:border-[#b0ff4c]/50 transition-colors"
               >
                 <img src="/miguel.svg" alt="Miguel Gómez" className="w-full h-full object-cover transition-transform duration-700 group-hover/video:scale-105" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/video:opacity-100 flex items-center justify-center transition-opacity duration-300">
@@ -388,7 +380,7 @@ export default function Home() {
                   <h4 className="text-white font-bold text-xl md:text-2xl mb-1">Miguel Gómez</h4>
                   <p className="text-white/40 text-xs font-medium tracking-wide">+3 años de experiencia</p>
                 </div>
-                <button onClick={() => setActiveVideo('/miguel_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform">
+                <button onClick={() => setActiveVideo('/miguel_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform shrink-0 ml-2">
                   <ArrowUpRight size={20} />
                 </button>
               </div>
@@ -396,15 +388,15 @@ export default function Home() {
 
             {/* CREADOR 2: Juan */}
             <div className="bg-gradient-to-b from-[#2a2a2a] to-[#222] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
-              <div className="w-full flex justify-center mb-4">
+              <div className="w-full flex justify-center mb-4 text-center">
                 <span className="text-[#8b5cf6] text-[10px] font-bold uppercase tracking-[0.2em] border border-[#8b5cf6]/30 px-4 py-1.5 rounded-full bg-[#8b5cf6]/10">
-                  CEO
+                  Cofundador - Desarrollador BACKEND
                 </span>
               </div>
 
               <div 
                 onClick={() => setActiveVideo('/juan_video.mp4')} 
-                className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video"
+                className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video border border-transparent hover:border-[#b0ff4c]/50 transition-colors"
               >
                 <img src="/juan.svg" alt="Juan Hernández" className="w-full h-full object-cover transition-transform duration-700 group-hover/video:scale-105" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/video:opacity-100 flex items-center justify-center transition-opacity duration-300">
@@ -417,7 +409,7 @@ export default function Home() {
                   <h4 className="text-white font-bold text-xl md:text-2xl mb-1">Juan Hernández</h4>
                   <p className="text-white/40 text-xs font-medium tracking-wide">+5 años de experiencia</p>
                 </div>
-                <button onClick={() => setActiveVideo('/juan_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform">
+                <button onClick={() => setActiveVideo('/juan_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform shrink-0 ml-2">
                   <ArrowUpRight size={20} />
                 </button>
               </div>
@@ -425,7 +417,7 @@ export default function Home() {
 
             {/* CREADOR 3: Gregory */}
             <div className="bg-gradient-to-b from-[#2a2a2a] to-[#222] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
-              <div className="w-full flex justify-center mb-4">
+              <div className="w-full flex justify-center mb-4 text-center">
                 <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] border border-white/10 px-4 py-1.5 rounded-full">
                   Tutor Académico
                 </span>
@@ -433,7 +425,7 @@ export default function Home() {
               
               <div 
                 onClick={() => setActiveVideo('/gregory_video.mp4')} 
-                className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video"
+                className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video border border-transparent hover:border-[#b0ff4c]/50 transition-colors"
               >
                 <img src="/gregory.jpg" alt="Gregory Cedetto" className="w-full h-full object-cover grayscale transition-all duration-700 group-hover/video:scale-105 group-hover/video:grayscale-0" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/video:opacity-100 flex items-center justify-center transition-opacity duration-300">
@@ -446,7 +438,7 @@ export default function Home() {
                   <h4 className="text-white font-bold text-xl md:text-2xl mb-1">Gregory Cedetto</h4>
                   <p className="text-white/40 text-xs font-medium tracking-wide">+15 años de experiencia</p>
                 </div>
-                <button onClick={() => setActiveVideo('/gregory_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform">
+                <button onClick={() => setActiveVideo('/gregory_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform shrink-0 ml-2">
                   <ArrowUpRight size={20} />
                 </button>
               </div>
@@ -488,6 +480,14 @@ export default function Home() {
           stroke-dashoffset: 400;
           animation: draw-circle 2s ease-out forwards;
           animation-delay: 0.5s;
+        }
+        @keyframes zoomIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </div>

@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, Settings, LogOut, 
-  Menu, Sun, Moon, PanelLeft, Activity, Clock, ChevronDown, UserPlus, Save, Search, X
+  Menu, Sun, Moon, PanelLeft, Activity, Clock, ChevronDown, 
+  UserPlus, Save, Search, X, CalendarPlus, FilePlus, ArrowLeft, CheckCircle, CalendarDays
 } from 'lucide-react';
 
 export default function DashboardAdmision() {
@@ -13,7 +14,10 @@ export default function DashboardAdmision() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [saludo, setSaludo] = useState('Hola');
   
+  const [vistaActual, setVistaActual] = useState('inicio');
+
   const [openPacienteMenu, setOpenPacienteMenu] = useState(false);
   const [openMedicoMenu, setOpenMedicoMenu] = useState(false);
   
@@ -31,14 +35,20 @@ export default function DashboardAdmision() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   
-  const [pacientesEnEspera, setPacientesEnEspera] = useState(0);
+  const [citasHoy, setCitasHoy] = useState([]);
+  const [citasProximas, setCitasProximas] = useState([]);
+  
   const [listaPacientes, setListaPacientes] = useState([]);
   const [listaMedicos, setListaMedicos] = useState([]);
 
-  // ================= LA ÚNICA FUENTE DE VERDAD =================
+  const [pacienteActivo, setPacienteActivo] = useState(null);
+  const [medicoActivo, setMedicoActivo] = useState(null);
+
   const [triajeData, setTriajeData] = useState({
     id_paciente: '',
     id_medico: '',
+    fecha_cita: new Date().toISOString().split('T')[0],
+    hora_cita: '', 
     motivo: '', 
     ta: '', 
     fc: '', 
@@ -56,9 +66,17 @@ export default function DashboardAdmision() {
     { id: '6', label: 'Dolor general' },
   ];
 
+  // ================= EFECTOS =================
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const hora = new Date().getHours();
+    if (hora >= 5 && hora < 12) setSaludo('¡Buenos días');
+    else if (hora >= 12 && hora < 19) setSaludo('¡Buenas tardes');
+    else setSaludo('¡Buenas noches');
+  }, []);
 
   const fetchData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -71,23 +89,48 @@ export default function DashboardAdmision() {
     }
     setUserData(dbUser);
 
-    const hoy = new Date().toISOString().split('T')[0];
-    const { count } = await supabase
+    // OBTENER CITAS DESDE HOY EN ADELANTE
+    const hoyInicio = new Date();
+    hoyInicio.setHours(0,0,0,0);
+
+    const { data: todasLasCitas } = await supabase
       .from('consultas')
-      .select('*', { count: 'exact', head: true })
-      .eq('estado', 'En Espera')
-      .gte('created_at', `${hoy}T00:00:00.000Z`);
-    setPacientesEnEspera(count || 0);
+      .select(`*, pacientes (id, nombres, apellidos)`)
+      .gte('fecha_consulta', hoyInicio.toISOString())
+      .order('fecha_consulta', { ascending: true });
+
+    if (todasLasCitas) {
+      const hoy = new Date();
+      
+      const deHoy = todasLasCitas.filter(c => {
+        const d = new Date(c.fecha_consulta);
+        return d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear();
+      });
+
+      const futuras = todasLasCitas.filter(c => {
+        const d = new Date(c.fecha_consulta);
+        const hoyFin = new Date();
+        hoyFin.setHours(23,59,59,999);
+        return d > hoyFin;
+      });
+
+      setCitasHoy(deHoy);
+      setCitasProximas(futuras);
+    }
 
     const { data: pacientesBD } = await supabase.from('pacientes').select('*').order('nombres', { ascending: true });
     if (pacientesBD) setListaPacientes(pacientesBD);
 
     const { data: todosLosUsuarios } = await supabase.from('usuarios').select('*');
     if (todosLosUsuarios) {
-      const soloMedicos = todosLosUsuarios.filter(user => 
-        user.rol === 'especialista' || 
-        (user.especialidad && user.especialidad !== 'Admisión / Triaje' && user.especialidad !== 'Departamento de Historias Clínicas')
-      );
+      const soloMedicos = todosLosUsuarios.filter(user => {
+        const rol = (user.rol || '').toLowerCase();
+        const esp = (user.especialidad || '').toLowerCase();
+        return (
+          rol === 'especialista' || rol === 'medico' || rol === 'médico' ||
+          (esp && esp !== 'admisión / triaje' && esp !== 'departamento de historias clínicas' && esp !== 'departamento de admisión')
+        );
+      });
       setListaMedicos(soloMedicos.filter(m => m.id_auth !== session.user.id));
     }
 
@@ -103,7 +146,7 @@ export default function DashboardAdmision() {
 
   const getInitials = () => {
     if (!userData) return "AS";
-    return `${userData.nombres?.charAt(0)}${userData.apellidos?.charAt(0)}`.toUpperCase();
+    return `${userData.nombres?.charAt(0) || ''}${userData.apellidos?.charAt(0) || ''}`.toUpperCase();
   };
 
   const handleInputChange = (e) => {
@@ -141,13 +184,17 @@ export default function DashboardAdmision() {
 
       if (error) throw error;
 
-      alert('¡Paciente registrado exitosamente!');
+      await supabase.from('historias_clinicas').insert([{ id_paciente: data.id }]);
+
+      alert('¡Paciente registrado y Expediente creado exitosamente!');
       
-      setListaPacientes(prev => [...prev, data].sort((a, b) => a.nombres.localeCompare(b.nombres)));
+      setListaPacientes(prev => [...prev, data].sort((a, b) => (a.nombres || '').localeCompare(b.nombres || '')));
+      setPacienteActivo(data);
       setTriajeData(prev => ({ ...prev, id_paciente: data.id }));
       
       setNuevoPaciente({ nombres: '', apellidos: '', cedula: '', telefono: '', fecha_nacimiento: '', sexo: '' });
       setShowRegistroModal(false);
+      setVistaActual('crear_historia');
 
     } catch (error) {
       alert("Error al registrar paciente: " + error.message);
@@ -158,31 +205,37 @@ export default function DashboardAdmision() {
 
   const handleGuardarTriaje = async (e) => {
     e.preventDefault();
-    if (!triajeData.id_paciente || !triajeData.id_medico) {
-      alert("Por favor selecciona un paciente y un médico en la cabecera de la historia clínica.");
+    if (!triajeData.id_paciente || !triajeData.id_medico || !triajeData.fecha_cita || !triajeData.hora_cita) {
+      alert("Faltan datos importantes: Por favor asegúrate de seleccionar Paciente, Médico, Fecha y Hora.");
       return;
     }
 
     setGuardando(true);
 
     try {
+      const datetimeString = `${triajeData.fecha_cita}T${triajeData.hora_cita}:00`;
+      const fechaConsulta = new Date(datetimeString);
+
       const sintomasList = triajeData.sintomasRapidos.length > 0 ? `Síntomas marcados: ${triajeData.sintomasRapidos.join(', ')}.` : '';
       const signosFormateados = `TA: ${triajeData.ta || 'N/A'} | FC: ${triajeData.fc || 'N/A'} | Peso: ${triajeData.peso || 'N/A'}kg | Talla: ${triajeData.talla || 'N/A'}m. ${sintomasList}`;
 
       const { error } = await supabase.from('consultas').insert([{
         id_paciente: triajeData.id_paciente,
         id_medico: triajeData.id_medico,
-        estado: 'En Espera',
+        estado: 'Agendada', 
         motivo: triajeData.motivo, 
         signos_vitales: signosFormateados,
-        fecha_consulta: new Date().toISOString(),
+        fecha_consulta: fechaConsulta.toISOString(),
       }]);
 
       if (error) throw error;
 
-      alert('¡Ficha enviada a la Sala de Espera del Especialista con éxito!');
+      alert('¡Historia guardada y Cita Agendada con éxito!');
       
-      setTriajeData({ id_paciente: '', id_medico: '', motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
+      setPacienteActivo(null);
+      setMedicoActivo(null);
+      setTriajeData({ id_paciente: '', id_medico: '', fecha_cita: new Date().toISOString().split('T')[0], hora_cita: '', motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
+      setVistaActual('inicio'); 
       fetchData(); 
       
     } catch (error) {
@@ -192,22 +245,52 @@ export default function DashboardAdmision() {
     }
   };
 
-  // Extraemos los datos completos solo para mostrarlos en la UI
-  const pacienteActivo = listaPacientes.find(p => String(p.id) === String(triajeData.id_paciente));
-  const medicoActivo = listaMedicos.find(m => String(m.id_auth || m.id) === String(triajeData.id_medico));
+  const handleMarcarLlegada = async (consultaId) => {
+    try {
+      const { error } = await supabase
+        .from('consultas')
+        .update({ estado: 'En Espera' })
+        .eq('id', consultaId);
+      
+      if (error) throw error;
+      fetchData(); 
+    } catch (error) {
+      alert("Error al marcar llegada: " + error.message);
+    }
+  };
 
-  // Filtros
-  const pacientesFiltrados = listaPacientes.filter(p => 
-    (p.nombres + ' ' + p.apellidos + ' ' + p.cedula).toLowerCase().includes(searchPaciente.toLowerCase())
-  );
-  const medicosFiltrados = listaMedicos.filter(m => 
-    (m.nombres + ' ' + m.apellidos + ' ' + (m.especialidad || '')).toLowerCase().includes(searchMedico.toLowerCase())
-  );
+  const formatearHoraExacta = (fechaIso) => {
+    if (!fechaIso) return '';
+    return new Date(fechaIso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  const formatearFecha = (fechaIso) => {
+    if (!fechaIso) return '';
+    return new Date(fechaIso).toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' });
+  };
+
+  const getNombreMedico = (idMedicoAuth) => {
+    const med = listaMedicos.find(m => m.id_auth === idMedicoAuth || m.id === idMedicoAuth);
+    return med ? `Dr(a). ${med.apellidos || med.nombres}` : 'Médico';
+  };
+
+  const pacientesFiltrados = listaPacientes.filter(p => {
+    const cadena = `${p.nombres || ''} ${p.apellidos || ''} ${p.cedula || ''}`.toLowerCase();
+    return cadena.includes(searchPaciente.toLowerCase());
+  });
+
+  const medicosFiltrados = listaMedicos.filter(m => {
+    const cadena = `${m.nombres || ''} ${m.apellidos || ''} ${m.especialidad || ''}`.toLowerCase();
+    return cadena.includes(searchMedico.toLowerCase());
+  });
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0B0D12]">
-        <div className="w-16 h-16 border-4 border-cyan-100 dark:border-slate-800 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 border-4 border-blue-100 dark:border-slate-800 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+          <p className="text-slate-500 dark:text-slate-400 font-bold animate-pulse">Cargando departamento...</p>
+        </div>
       </div>
     );
   }
@@ -215,22 +298,20 @@ export default function DashboardAdmision() {
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
-      {/* OVERLAY LATERAL PARA MOVILES */}
+      {openPacienteMenu && <div className="fixed inset-0 z-[90]" onClick={() => setOpenPacienteMenu(false)}></div>}
+      {openMedicoMenu && <div className="fixed inset-0 z-[90]" onClick={() => setOpenMedicoMenu(false)}></div>}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
 
-      {/* ========================================================================= */}
-      {/* MODAL DE REGISTRO RÁPIDO DE PACIENTE */}
-      {/* ========================================================================= */}
+      {/* ================= MODAL REGISTRO DE PACIENTE ================= */}
       {showRegistroModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="w-full max-w-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-            
             <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-white/5">
               <div>
                 <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <UserPlus className="text-[#2563eb]" size={24} /> Registrar Nuevo Paciente
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">Crea la ficha para el historial clínico.</p>
+                <p className="text-sm text-slate-500 mt-1">Crea la ficha base para el historial clínico.</p>
               </div>
               <button onClick={() => setShowRegistroModal(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-100 dark:bg-white/5 rounded-full transition-colors">
                 <X size={20} />
@@ -286,7 +367,6 @@ export default function DashboardAdmision() {
                 {guardandoPaciente ? 'Guardando...' : <><Save size={18} /> Guardar Ficha</>}
               </button>
             </div>
-
           </div>
         </div>
       )}
@@ -404,286 +484,426 @@ export default function DashboardAdmision() {
           </button>
         </header>
 
-        <div className="p-6 sm:p-8 max-w-[1200px] mx-auto w-full space-y-8">
+        <div className="p-6 sm:p-8 max-w-[1400px] mx-auto w-full space-y-10">
           
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                Dpto. de Historias Clínicas
-              </h2>
-              <p className="text-slate-500 mt-2 text-sm sm:text-base">Gestiona el triaje inicial y remite a los pacientes con el especialista.</p>
-            </div>
-            
-            <div className="bg-[#2563eb] text-white rounded-2xl px-6 py-4 flex items-center gap-6 shadow-[0_10px_30px_rgba(37,99,235,0.2)] shrink-0">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <Clock size={20} />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-0.5">En Espera Hoy</p>
-                <h3 className="text-3xl font-black leading-none">{pacientesEnEspera}</h3>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative z-10 animate-[fadeIn_0.3s_ease-out]">
-            
-            <div className="bg-[#F8F7F4] text-slate-900 border border-[#D5D0C6] rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col mx-auto">
+          {/* ================= VISTA 1: DASHBOARD DINÁMICO ================= */}
+          {vistaActual === 'inicio' && (
+            <div className="space-y-10 animate-[fadeIn_0.3s_ease-out]">
               
-              <div className="p-8 pb-4 border-b-2 border-slate-400 bg-[#F8F7F4] rounded-t-md">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">SISTEMA MÉDICO SOMA</p>
-                    <p className="text-xs font-semibold text-slate-600">DEPARTAMENTO DE HISTORIAS CLÍNICAS</p>
+              {/* ================= SALUDO Y MUÑECA ================= */}
+              <div className="flex flex-row items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
+                    {saludo} <br className="hidden sm:block" />
+                    Asistente {userData?.apellidos || ''}!
+                  </h2>
+                </div>
+                
+                <div className="shrink-0">
+                  <img 
+                    src="/ruta-mascota-doctora-der.svg" 
+                    alt="Asistente SOMA" 
+                    className="w-20 sm:w-28 md:w-32 drop-shadow-[0_10px_15px_rgba(0,0,0,0.3)] pointer-events-none transition-transform hover:scale-105" 
+                  />
+                </div>
+              </div>
+
+              {/* ================= BOTONES COMPACTOS (Estilo Doctor) ================= */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 relative">
+                  <button onClick={() => setShowRegistroModal(true)} className="flex items-center justify-center gap-3 py-4 px-4 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
+                    <UserPlus size={20} />
+                    <span className="text-sm sm:text-base">Registrar Paciente</span>
+                  </button>
+                  
+                  <button onClick={() => setVistaActual('crear_historia')} className="flex items-center justify-center gap-3 py-4 px-4 bg-[#10b981] hover:bg-[#059669] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
+                    <FilePlus size={20} />
+                    <span className="text-sm sm:text-base">Crear Historia / Cita</span>
+                  </button>
+                  
+                  <Link to="/agenda" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
+                    <CalendarPlus size={20} />
+                    <span className="text-sm sm:text-base">Ver Agenda</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* ================= PANELES GEMELOS (Hoy vs Próximas) ================= */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* PANEL 1: Citas de Hoy (Recepción) */}
+                <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
+                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+                      <Clock size={20} className="text-[#2563eb] dark:text-[#b0ff4c]" /> Pacientes de Hoy
+                    </h3>
+                    <span className="text-xs font-bold bg-[#2563eb]/10 text-[#2563eb] dark:bg-[#b0ff4c]/20 dark:text-[#b0ff4c] px-3 py-1 rounded-full">
+                      {citasHoy.length} citas
+                    </span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Forma 01-TRJ</p>
+                  
+                  <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
+                    {citasHoy.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                        <Clock size={56} className="text-slate-300 dark:text-white/10 mb-4" strokeWidth={1.5} />
+                        <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Día Libre</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm leading-relaxed">
+                          No hay citas programadas para el día de hoy.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {citasHoy.map((cita) => (
+                          <div key={cita.id} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] hover:border-[#2563eb]/50 dark:hover:border-[#b0ff4c]/50 transition-colors shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white text-lg">
+                                  {cita.pacientes?.nombres} {cita.pacientes?.apellidos}
+                                </h4>
+                                <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                                  Asignado a: {getNombreMedico(cita.id_medico)}
+                                </p>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-bold bg-slate-200 dark:bg-white/5 px-2 py-1 rounded-md flex items-center gap-1 border border-slate-300 dark:border-white/5">
+                                <Clock size={10} /> {formatearHoraExacta(cita.fecha_consulta)}
+                              </span>
+                            </div>
+                            
+                            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
+                              {cita.estado === 'Agendada' ? (
+                                <button 
+                                  onClick={() => handleMarcarLlegada(cita.id)}
+                                  className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-all flex justify-center items-center gap-2"
+                                >
+                                  <CheckCircle size={16} /> Anunciar Llegada
+                                </button>
+                              ) : cita.estado === 'En Espera' ? (
+                                <span className="w-full text-center border border-amber-300 text-amber-600 dark:border-amber-500/30 dark:text-amber-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-50 dark:bg-amber-500/10">
+                                  En Sala de Espera
+                                </span>
+                              ) : (
+                                <span className="w-full text-center border border-emerald-300 text-emerald-600 dark:border-emerald-500/30 dark:text-emerald-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-50 dark:bg-emerald-500/10">
+                                  {cita.estado}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* PANEL 2: Próximas Citas */}
+                <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
+                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+                      <CalendarDays size={20} className="text-[#8b5cf6]" /> Próximas Citas
+                    </h3>
+                    <Link to="/agenda" className="text-xs font-bold text-[#8b5cf6] hover:underline">
+                      Ver Agenda Completa
+                    </Link>
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
+                    {citasProximas.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                        <CalendarDays size={56} className="text-slate-300 dark:text-white/10 mb-4" strokeWidth={1.5} />
+                        <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Agenda Despejada</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm leading-relaxed">
+                          No hay citas agendadas a futuro por el momento.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {citasProximas.slice(0, 5).map((cita) => (
+                          <div key={cita.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] flex items-center justify-between gap-4">
+                            <div className="overflow-hidden">
+                              <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                                {cita.pacientes?.nombres} {cita.pacientes?.apellidos}
+                              </h4>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                {getNombreMedico(cita.id_medico)}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{formatearFecha(cita.fecha_consulta)}</p>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase">{formatearHoraExacta(cita.fecha_consulta)}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {citasProximas.length > 5 && (
+                          <Link to="/agenda" className="block text-center text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white py-2">
+                            Ver {citasProximas.length - 5} citas más...
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ================= VISTA 2: FORMULARIO DE HISTORIA (HOJA FÍSICA) ================= */}
+          {vistaActual === 'crear_historia' && (
+            <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+              
+              <button 
+                onClick={() => setVistaActual('inicio')}
+                className="flex items-center gap-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white font-bold transition-colors bg-slate-200 dark:bg-white/5 px-4 py-2 rounded-lg w-fit"
+              >
+                <ArrowLeft size={18} /> Volver al Inicio
+              </button>
+
+              <div className="bg-[#F8F7F4] text-slate-900 border border-[#D5D0C6] rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col mx-auto max-w-4xl relative z-10">
+                
+                <div className="p-8 pb-4 border-b-2 border-slate-400 bg-[#F8F7F4] rounded-t-md">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">SISTEMA MÉDICO SOMA</p>
+                      <p className="text-xs font-semibold text-slate-600">DEPARTAMENTO DE HISTORIAS CLÍNICAS</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Forma 01-TRJ</p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-serif font-bold text-slate-800 tracking-wider">HISTORIA CLÍNICA</h2>
+                    <p className="text-sm font-serif text-slate-600 tracking-widest uppercase mt-1">Apertura y Triaje</p>
                   </div>
                 </div>
                 
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-serif font-bold text-slate-800 tracking-wider">HISTORIA CLÍNICA</h2>
-                  <p className="text-sm font-serif text-slate-600 tracking-widest uppercase mt-1">Parte I - Triaje</p>
+                <div className="px-8 pb-8">
+                  <form id="formTriaje" onSubmit={handleGuardarTriaje} className="space-y-8">
+                    
+                    {/* FILA 1: PACIENTE Y MÉDICO (Z-Index alto asegurado) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4 relative z-[100]">
+                      
+                      {/* DROPDOWN PACIENTE */}
+                      <div className="relative">
+                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
+                        <button 
+                          type="button"
+                          onClick={() => { setOpenPacienteMenu(!openPacienteMenu); setOpenMedicoMenu(false); }}
+                          className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
+                        >
+                          <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
+                            {pacienteActivo ? `${pacienteActivo.nombres} ${pacienteActivo.apellidos}` : '(Clic para buscar...)'}
+                          </span>
+                          <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openPacienteMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
+                        </button>
+                        
+                        {openPacienteMenu && (
+                          <>
+                            <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
+                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                              <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+                                <Search size={16} className="text-slate-400 shrink-0" />
+                                <input type="text" placeholder="Buscar nombre o cédula..." value={searchPaciente} onChange={(e) => setSearchPaciente(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" autoFocus />
+                              </div>
+                              <div className="p-2 border-b border-slate-200 bg-slate-50/50">
+                                <button type="button" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); setShowRegistroModal(true); }} className="w-full flex items-center justify-center gap-2 py-2 bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg font-bold text-sm transition-colors">
+                                  <UserPlus size={16} /> Registrar Nuevo Paciente
+                                </button>
+                              </div>
+                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-[110]">
+                                {pacientesFiltrados.length === 0 ? (
+                                  <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron pacientes.</div>
+                                ) : (
+                                  pacientesFiltrados.map(p => (
+                                    <button 
+                                      key={p.id} 
+                                      type="button" 
+                                      onClick={(e) => { 
+                                        e.preventDefault();
+                                        e.stopPropagation(); 
+                                        setTriajeData(prev => ({ ...prev, id_paciente: p.id })); 
+                                        setPacienteActivo(p); 
+                                        setOpenPacienteMenu(false); 
+                                        setSearchPaciente(''); 
+                                      }} 
+                                      className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium flex justify-between items-center group"
+                                    >
+                                      <span>{p.nombres} {p.apellidos}</span>
+                                      <span className="opacity-50 text-xs font-normal group-hover:opacity-100 transition-opacity">C.I: {p.cedula}</span>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* DROPDOWN MÉDICO (Blindado) */}
+                      <div className="relative">
+                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
+                        <button 
+                          type="button"
+                          onClick={() => { setOpenMedicoMenu(!openMedicoMenu); setOpenPacienteMenu(false); }}
+                          className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
+                        >
+                          <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
+                            {medicoActivo ? `Dr(a). ${medicoActivo.nombres} ${medicoActivo.apellidos}` : '(Clic para asignar...)'}
+                          </span>
+                          <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openMedicoMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
+                        </button>
+                        
+                        {openMedicoMenu && (
+                          <>
+                            <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
+                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                              <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+                                <Search size={16} className="text-slate-400 shrink-0" />
+                                <input type="text" placeholder="Buscar médico..." value={searchMedico} onChange={(e) => setSearchMedico(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" autoFocus />
+                              </div>
+                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-[110]">
+                                {medicosFiltrados.length === 0 ? (
+                                  <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron médicos.</div>
+                                ) : (
+                                  medicosFiltrados.map(m => (
+                                    <button 
+                                      key={m.id_auth || m.id} 
+                                      type="button" 
+                                      onClick={(e) => { 
+                                        e.preventDefault();
+                                        e.stopPropagation(); 
+                                        setTriajeData(prev => ({ ...prev, id_medico: m.id_auth || m.id })); 
+                                        setMedicoActivo(m); 
+                                        setOpenMedicoMenu(false); 
+                                        setSearchMedico(''); 
+                                      }} 
+                                      className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium"
+                                    >
+                                      Dr(a). {m.nombres} {m.apellidos} <span className="opacity-50 text-xs ml-1 font-normal block sm:inline mt-1 sm:mt-0">- {m.especialidad || 'Especialista'}</span>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* FILA 2: FECHA Y HORA DE LA CITA */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-2 relative z-[80]">
+                      <div>
+                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">FECHA DE LA CITA</span>
+                        <input 
+                          type="date" 
+                          name="fecha_cita" 
+                          value={triajeData.fecha_cita} 
+                          onChange={handleInputChange} 
+                          className="w-full py-2 bg-transparent border-b border-slate-400 text-blue-900 font-serif text-lg font-bold tracking-wide italic outline-none cursor-pointer" 
+                          required 
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">HORA ESTIPULADA</span>
+                        <input 
+                          type="time" 
+                          name="hora_cita" 
+                          value={triajeData.hora_cita} 
+                          onChange={handleInputChange} 
+                          className="w-full py-2 bg-transparent border-b border-slate-400 text-blue-900 font-serif text-lg font-bold tracking-wide italic outline-none cursor-pointer" 
+                          required 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 relative z-10">
+                      <div className="mb-4 border-b border-slate-400 pb-1">
+                        <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                          1.- Examen Funcional / Síntomas Rápidos
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-3 pl-2">
+                        {listaSintomasIVSS.map((sintoma) => (
+                          <label key={sintoma.id} className="flex items-center gap-3 cursor-pointer group">
+                            <div className="relative flex items-center justify-center w-5 h-5 border border-slate-500 bg-white group-hover:border-slate-800 transition-colors">
+                              <input type="checkbox" className="opacity-0 absolute" checked={triajeData.sintomasRapidos.includes(sintoma.label)} onChange={() => handleCheckboxChange(sintoma.label)} />
+                              {triajeData.sintomasRapidos.includes(sintoma.label) && <span className="text-blue-900 font-serif font-black text-sm leading-none select-none italic">X</span>}
+                            </div>
+                            <span className="text-xs font-medium text-slate-700 select-none group-hover:text-slate-900 uppercase tracking-wide">
+                              <span className="text-slate-400 mr-2">{sintoma.id}.</span> {sintoma.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 relative z-10">
+                      <div className="mb-4 border-b border-slate-400 pb-1">
+                        <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                          2.- Signos Vitales
+                        </h3>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-8 gap-y-5 text-xs font-bold uppercase tracking-widest text-slate-700 pl-2">
+                        <div className="flex items-end gap-2">
+                          <span>Tensión (TA):</span>
+                          <input type="text" name="ta" value={triajeData.ta} onChange={handleInputChange} className="w-24 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ / ___" />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <span>Frecuencia (FC):</span>
+                          <input type="text" name="fc" value={triajeData.fc} onChange={handleInputChange} className="w-20 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ lpm" />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <span>Peso:</span>
+                          <input type="number" name="peso" value={triajeData.peso} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ kg" />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <span>Talla:</span>
+                          <input type="number" step="0.01" name="talla" value={triajeData.talla} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ m" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 relative z-10">
+                      <div className="mb-4 border-b border-slate-400 pb-1">
+                        <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
+                          3.- Motivo de la Consulta / Notas
+                        </h3>
+                      </div>
+                      
+                      <textarea 
+                        name="motivo" 
+                        value={triajeData.motivo} 
+                        onChange={handleInputChange} 
+                        required
+                        className="w-full bg-transparent border-0 outline-none text-blue-900 font-serif italic text-sm leading-[31px] resize-none min-h-[160px]"
+                        style={{
+                          backgroundImage: 'repeating-linear-gradient(transparent, transparent 30px, #cbd5e1 30px, #cbd5e1 31px)',
+                          backgroundAttachment: 'local',
+                          lineHeight: '31px',
+                          paddingTop: '2px'
+                        }}
+                      ></textarea>
+                    </div>
+
+                  </form>
                 </div>
               </div>
-              
-              <div className="px-8 pb-8">
-                <form id="formTriaje" onSubmit={handleGuardarTriaje} className="space-y-8">
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4 relative">
-                    
-                    {/* ======================================================== */}
-                    {/* SELECT PACIENTE (CON SOLUCIÓN Z-INDEX INTERNA) */}
-                    {/* ======================================================== */}
-                    <div className="relative">
-                      <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
-                      <button 
-                        type="button"
-                        onClick={() => { setOpenPacienteMenu(!openPacienteMenu); setOpenMedicoMenu(false); }}
-                        className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
-                      >
-                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
-                          {pacienteActivo ? `${pacienteActivo.nombres} ${pacienteActivo.apellidos}` : '(Clic para buscar...)'}
-                        </span>
-                        <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openPacienteMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
-                      </button>
-                      
-                      {openPacienteMenu && (
-                        <>
-                          {/* BACKDROP LOCAL (Evita el choque de z-index con la raíz) */}
-                          <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
-                          
-                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
-                            
-                            <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
-                              <Search size={16} className="text-slate-400 shrink-0" />
-                              <input 
-                                type="text" 
-                                placeholder="Buscar nombre o cédula..." 
-                                value={searchPaciente}
-                                onChange={(e) => setSearchPaciente(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
-                                autoFocus
-                              />
-                            </div>
 
-                            <div className="p-2 border-b border-slate-200 bg-slate-50/50">
-                              <button 
-                                type="button" 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setOpenPacienteMenu(false); 
-                                  setShowRegistroModal(true); 
-                                }}
-                                className="w-full flex items-center justify-center gap-2 py-2 bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg font-bold text-sm transition-colors"
-                              >
-                                <UserPlus size={16} /> Registrar Nuevo Paciente
-                              </button>
-                            </div>
-
-                            <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa">
-                              {pacientesFiltrados.length === 0 ? (
-                                <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron pacientes.</div>
-                              ) : (
-                                pacientesFiltrados.map(p => (
-                                  <button 
-                                    key={p.id} 
-                                    type="button"
-                                    onClick={(e) => { 
-                                      e.stopPropagation();
-                                      setTriajeData(prev => ({ ...prev, id_paciente: p.id })); 
-                                      setOpenPacienteMenu(false); 
-                                      setSearchPaciente(''); 
-                                    }}
-                                    className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium flex justify-between items-center group"
-                                  >
-                                    <span>{p.nombres} {p.apellidos}</span>
-                                    <span className="opacity-50 text-xs font-normal group-hover:opacity-100 transition-opacity">C.I: {p.cedula}</span>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* ======================================================== */}
-                    {/* SELECT MÉDICO (CON SOLUCIÓN Z-INDEX INTERNA) */}
-                    {/* ======================================================== */}
-                    <div className="relative">
-                      <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
-                      <button 
-                        type="button"
-                        onClick={() => { setOpenMedicoMenu(!openMedicoMenu); setOpenPacienteMenu(false); }}
-                        className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
-                      >
-                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
-                          {medicoActivo ? `Dr(a). ${medicoActivo.nombres} ${medicoActivo.apellidos}` : '(Clic para asignar...)'}
-                        </span>
-                        <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openMedicoMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
-                      </button>
-                      
-                      {openMedicoMenu && (
-                        <>
-                          {/* BACKDROP LOCAL */}
-                          <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
-                          
-                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
-                            
-                            <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
-                              <Search size={16} className="text-slate-400 shrink-0" />
-                              <input 
-                                type="text" 
-                                placeholder="Buscar médico o especialidad..." 
-                                value={searchMedico}
-                                onChange={(e) => setSearchMedico(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
-                                autoFocus
-                              />
-                            </div>
-
-                            <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa">
-                              {medicosFiltrados.length === 0 ? (
-                                <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron médicos.</div>
-                              ) : (
-                                medicosFiltrados.map(m => (
-                                  <button 
-                                    key={m.id_auth || m.id} 
-                                    type="button"
-                                    onClick={(e) => { 
-                                      e.stopPropagation();
-                                      setTriajeData(prev => ({ ...prev, id_medico: m.id_auth || m.id })); 
-                                      setOpenMedicoMenu(false); 
-                                      setSearchMedico('');
-                                    }}
-                                    className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium"
-                                  >
-                                    Dr(a). {m.nombres} {m.apellidos} <span className="opacity-50 text-xs ml-1 font-normal block sm:inline mt-1 sm:mt-0">- {m.especialidad || 'Especialista'}</span>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-2 relative z-10">
-                    <div className="mb-4 border-b border-slate-400 pb-1">
-                      <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
-                        1.- Examen Funcional / Síntomas Rápidos
-                      </h3>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-3 pl-2">
-                      {listaSintomasIVSS.map((sintoma) => (
-                        <label key={sintoma.id} className="flex items-center gap-3 cursor-pointer group">
-                          <div className="relative flex items-center justify-center w-5 h-5 border border-slate-500 bg-white group-hover:border-slate-800 transition-colors">
-                            <input 
-                              type="checkbox" 
-                              className="opacity-0 absolute"
-                              checked={triajeData.sintomasRapidos.includes(sintoma.label)}
-                              onChange={() => handleCheckboxChange(sintoma.label)}
-                            />
-                            {triajeData.sintomasRapidos.includes(sintoma.label) && (
-                              <span className="text-blue-900 font-serif font-black text-sm leading-none select-none italic">X</span>
-                            )}
-                          </div>
-                          <span className="text-xs font-medium text-slate-700 select-none group-hover:text-slate-900 uppercase tracking-wide">
-                            <span className="text-slate-400 mr-2">{sintoma.id}.</span> {sintoma.label}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-2 relative z-10">
-                    <div className="mb-4 border-b border-slate-400 pb-1">
-                      <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
-                        2.- Signos Vitales
-                      </h3>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-x-8 gap-y-5 text-xs font-bold uppercase tracking-widest text-slate-700 pl-2">
-                      <div className="flex items-end gap-2">
-                        <span>Tensión (TA):</span>
-                        <input type="text" name="ta" value={triajeData.ta} onChange={handleInputChange} className="w-24 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ / ___" />
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <span>Frecuencia (FC):</span>
-                        <input type="text" name="fc" value={triajeData.fc} onChange={handleInputChange} className="w-20 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ lpm" />
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <span>Peso:</span>
-                        <input type="number" name="peso" value={triajeData.peso} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ kg" />
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <span>Talla:</span>
-                        <input type="number" step="0.01" name="talla" value={triajeData.talla} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ m" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 relative z-10">
-                    <div className="mb-4 border-b border-slate-400 pb-1">
-                      <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
-                        3.- Motivo de la Consulta / Notas
-                      </h3>
-                    </div>
-                    
-                    <textarea 
-                      name="motivo" 
-                      value={triajeData.motivo} 
-                      onChange={handleInputChange} 
-                      required
-                      className="w-full bg-transparent border-0 outline-none text-blue-900 font-serif italic text-sm leading-[31px] resize-none min-h-[160px]"
-                      style={{
-                        backgroundImage: 'repeating-linear-gradient(transparent, transparent 30px, #cbd5e1 30px, #cbd5e1 31px)',
-                        backgroundAttachment: 'local',
-                        lineHeight: '31px',
-                        paddingTop: '2px'
-                      }}
-                    ></textarea>
-                  </div>
-
-                </form>
+              <div className="mt-6 flex justify-end relative z-10 pb-10">
+                <button 
+                  type="submit"
+                  form="formTriaje"
+                  disabled={guardando || !triajeData.id_paciente || !triajeData.id_medico || !triajeData.fecha_cita || !triajeData.hora_cita} 
+                  className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 flex justify-center items-center gap-2 transition-all transform hover:-translate-y-1 disabled:hover:translate-y-0"
+                >
+                  {guardando ? 'Procesando...' : <><Save size={20} /> Guardar Historia y Agendar Cita</>}
+                </button>
               </div>
-            </div>
 
-            <div className="mt-6 flex justify-end relative z-10 pb-10">
-              <button 
-                type="button"
-                onClick={handleGuardarTriaje}
-                disabled={guardando || !triajeData.id_paciente || !triajeData.id_medico} 
-                className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 flex justify-center items-center gap-2 transition-all transform hover:-translate-y-1 disabled:hover:translate-y-0"
-              >
-                {guardando ? 'Procesando...' : <><FileText size={20} /> Guardar Historia y Remitir</>}
-              </button>
             </div>
+          )}
 
-          </div>
         </div>
       </main>
 

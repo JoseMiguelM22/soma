@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Home, Users, FileText, Calendar, User, LogOut, 
+  Home, Users, FileText, Calendar as CalendarIcon, User, Settings, LogOut, 
   Menu, Sun, Moon, Plus, X, PanelLeft, Clock, 
-  ChevronLeft, ChevronRight, Link as LinkIcon, Copy, Calendar as CalendarIcon, Check
+  ChevronLeft, ChevronRight, Link as LinkIcon, Check, Activity
 } from 'lucide-react';
 
 export default function Agendas() {
@@ -27,11 +27,15 @@ export default function Agendas() {
   const [isModalCitaOpen, setIsModalCitaOpen] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [nuevaCita, setNuevaCita] = useState({
-    id_paciente: '', fecha_hora: '', estado: 'Pendiente', 
+    id_paciente: '', fecha_hora: '', estado: 'Agendada', 
     consultorio: '', titulo: '', notas: ''
   });
 
-  const listaConsultorios = ["Medics"];
+  // ================= MODAL DETALLE DE CITA (NUEVO) =================
+  const [selectedCita, setSelectedCita] = useState(null);
+  const [remitiendo, setRemitiendo] = useState(false);
+
+  const listaConsultorios = ["Medics", "SOMA Principal"];
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -48,26 +52,38 @@ export default function Agendas() {
     if (dbUser) setUserData(dbUser);
     
     // Cargar pacientes para el select del modal
-    const { data: dbPacientes } = await supabase.from('pacientes').select('*').eq('id_medico', session.user.id).order('nombres', { ascending: true });
+    let queryPacientes = supabase.from('pacientes').select('*').order('nombres', { ascending: true });
+    if (dbUser?.rol === 'especialista') {
+      queryPacientes = queryPacientes.eq('id_medico', session.user.id);
+    }
+    const { data: dbPacientes } = await queryPacientes;
     if (dbPacientes) setPacientesLista(dbPacientes);
 
-    cargarCitas();
+    cargarCitas(dbUser, session.user.id);
   };
 
-  const cargarCitas = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const { data, error } = await supabase
-      .from('citas')
+  const cargarCitas = async (usuarioDb, authId) => {
+    // Rango de fechas amplio para ver tanto la semana como el mes
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
+
+    let query = supabase
+      .from('consultas')
       .select('*, pacientes(nombres, apellidos, cedula)')
-      .eq('id_medico', session.user.id)
-      .order('fecha_hora', { ascending: true });
+      .gte('fecha_consulta', startOfMonth.toISOString())
+      .lte('fecha_consulta', endOfMonth.toISOString())
+      .order('fecha_consulta', { ascending: true });
       
+    if (usuarioDb?.rol === 'especialista') {
+      query = query.eq('id_medico', authId);
+    }
+
+    const { data, error } = await query;
     if (!error && data) setCitas(data);
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [navigate]);
+  useEffect(() => { fetchData(); }, [currentDate, navigate]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -80,7 +96,8 @@ export default function Agendas() {
   };
 
   const copiarEnlace = () => {
-    navigator.clipboard.writeText(`https://Soma.com/medico/${userData?.nombres}-${userData?.apellidos}`.toLowerCase().replace(/\s+/g, '-'));
+    const enlace = `https://Soma.com/medico/${userData?.nombres}-${userData?.apellidos}`.toLowerCase().replace(/\s+/g, '-');
+    navigator.clipboard.writeText(enlace);
     alert("Enlace de citas copiado");
   };
 
@@ -89,25 +106,48 @@ export default function Agendas() {
     setGuardando(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const { error } = await supabase.from('citas').insert([{
+      
+      const fechaObj = new Date(nuevaCita.fecha_hora);
+
+      const { error } = await supabase.from('consultas').insert([{
         id_medico: session.user.id,
         id_paciente: nuevaCita.id_paciente,
-        fecha_hora: nuevaCita.fecha_hora,
+        fecha_consulta: fechaObj.toISOString(),
         estado: nuevaCita.estado,
-        consultorio: nuevaCita.consultorio || 'Sin especificar',
-        titulo: nuevaCita.titulo,
-        notas: nuevaCita.notas
+        motivo: nuevaCita.titulo || nuevaCita.notas || 'Cita Programada'
       }]);
+
       if (error) throw error;
       
       setIsModalCitaOpen(false);
-      setNuevaCita({ id_paciente: '', fecha_hora: '', estado: 'Pendiente', consultorio: '', titulo: '', notas: '' });
-      cargarCitas();
+      setNuevaCita({ id_paciente: '', fecha_hora: '', estado: 'Agendada', consultorio: '', titulo: '', notas: '' });
+      fetchData();
       alert("Cita agendada correctamente.");
     } catch (err) {
-      alert("Error al agendar: Verifica que la tabla 'citas' exista en la BD.");
+      alert("Error al agendar cita: " + err.message);
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // ================= FUNCIÓN PARA REMITIR AL MÉDICO =================
+  const handleRemitirMedico = async (citaId) => {
+    setRemitiendo(true);
+    try {
+      const { error } = await supabase
+        .from('consultas')
+        .update({ estado: 'En Espera' })
+        .eq('id', citaId);
+      
+      if (error) throw error;
+      
+      alert("¡Paciente remitido a la Sala de Espera del Médico!");
+      setSelectedCita(null); // Cierra el modal
+      fetchData(); // Recarga las citas para pintar el cambio de color
+    } catch (err) {
+      alert("Error al remitir: " + err.message);
+    } finally {
+      setRemitiendo(false);
     }
   };
 
@@ -115,7 +155,7 @@ export default function Agendas() {
   const getStartOfWeek = (d) => {
     const date = new Date(d);
     const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para que Lunes sea el primer día
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(date.setDate(diff));
   };
 
@@ -125,7 +165,6 @@ export default function Agendas() {
     return result;
   };
 
-  // NAVEGACIÓN DE FECHAS
   const prevDate = () => {
     if (viewMode === 'Semana') setCurrentDate(addDays(currentDate, -7));
     else setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -138,7 +177,6 @@ export default function Agendas() {
 
   const goToToday = () => setCurrentDate(new Date());
 
-  // GENERAR ARREGLOS DE DÍAS
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(getStartOfWeek(currentDate), i));
 
   const getMonthDays = () => {
@@ -148,13 +186,10 @@ export default function Agendas() {
     const lastDay = new Date(year, month + 1, 0);
     
     let days = [];
-    let startDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; // Ajuste Lunes=0
+    let startDayOfWeek = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1; 
     
-    // Días del mes anterior (Relleno)
     for(let i = startDayOfWeek; i > 0; i--) days.push(new Date(year, month, 1 - i));
-    // Días del mes actual
     for(let i = 1; i <= lastDay.getDate(); i++) days.push(new Date(year, month, i));
-    // Días del próximo mes (Relleno para completar cuadricula de 42 celdas = 6 semanas)
     const extraDays = 42 - days.length;
     for(let i = 1; i <= extraDays; i++) days.push(new Date(year, month + 1, i));
     
@@ -162,7 +197,6 @@ export default function Agendas() {
   };
   const monthDays = getMonthDays();
 
-  // FORMATOS VISUALES
   const formatHeaderRange = () => {
     if (viewMode === 'Semana') {
       const start = weekDays[0];
@@ -184,30 +218,38 @@ export default function Agendas() {
   
   const getCitasParaDia = (date) => {
     return citas.filter(c => {
-      const citaDate = new Date(c.fecha_hora);
+      const citaDate = new Date(c.fecha_consulta);
       return isSameDay(citaDate, date);
-    }).sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora));
+    }).sort((a, b) => new Date(a.fecha_consulta) - new Date(b.fecha_consulta));
   };
 
   const formatHora = (fechaString) => {
     return new Date(fechaString).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
-  // Color del puntito según el estado
   const getStatusColor = (estado) => {
-    if (estado === 'Confirmada') return 'bg-emerald-500';
-    if (estado === 'Cancelada') return 'bg-rose-500';
-    return 'bg-amber-400'; // Pendiente
+    if (estado === 'En Espera') return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+    if (estado === 'En Consulta') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+    if (estado === 'Cancelada') return 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+    return 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'; // Agendada
+  };
+
+  const getStatusColorSolid = (estado) => {
+    if (estado === 'En Espera') return 'bg-amber-400';
+    if (estado === 'En Consulta') return 'bg-emerald-400';
+    if (estado === 'Cancelada') return 'bg-rose-400';
+    return 'bg-cyan-400'; // Agendada
   };
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
       
+      {/* CAPA OSCURA PARA MÓVILES */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* ================= SIDEBAR ================= */}
+      {/* ================= SIDEBAR (MENÚ DE LA IZQUIERDA) ================= */}
       <aside 
         className={`
           fixed inset-y-0 left-0 z-50 
@@ -223,28 +265,44 @@ export default function Agendas() {
         `}>
         <div>
           <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 tracking-widest overflow-hidden whitespace-nowrap">
-              <span className="text-cyan-600 dark:text-cyan-400 text-2xl"></span>{!isCollapsed && <span></span>}
-              <img src="/soma_logo.png" alt="SOMA" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+            <Link to={userData?.rol === 'especialista' ? '/dashboard' : '/admision'} className="flex items-center overflow-hidden whitespace-nowrap">
+              {isCollapsed ? (
+                <span className="text-cyan-500 text-2xl font-black">S</span>
+              ) : (
+                <>
+                  <img src="/soma_logo.png" alt="SOMA" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
                   <img src="/soma_logo_blanco.png" alt="SOMA" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
-            </h1>
-            {!isCollapsed && (<button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>)}
+                </>
+              )}
+            </Link>
+            {!isCollapsed && (
+              <button className="md:hidden text-slate-500 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}>
+                <X size={24} />
+              </button>
+            )}
           </div>
 
           <div className={`py-6 ${isCollapsed ? 'px-2' : 'px-4'}`}>
             {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest">HERRAMIENTAS</p>}
             <nav className="space-y-2">
-              <Link to="/dashboard" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}</Link>
-              <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}</Link>
-              <Link to="/historias" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors"><FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}</Link>
-              <Link to="/agenda" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors"><Calendar size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}</Link>
+              <Link to={userData?.rol === 'especialista' ? '/dashboard' : '/admision'} className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
+                <Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}
+              </Link>
+              <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
+                <Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}
+              </Link>
+              <Link to="/historias" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
+                <FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}
+              </Link>
+              <Link to="/agenda" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors">
+                <CalendarIcon size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}
+              </Link>
+              <Link to="/estadisticas" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
+                <Activity size={20} className="shrink-0" />{!isCollapsed && <span>Estadísticas</span>}
+              </Link>
             </nav>
           </div>
         </div>
-
-        
-
-        
 
         <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
@@ -253,7 +311,7 @@ export default function Agendas() {
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-tight">Médico</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">{userData?.rol || 'Rol'}</p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
                   {userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
                 </p>
@@ -266,13 +324,17 @@ export default function Agendas() {
         </div>
       </aside>
 
-      {/* ================= CONTENIDO PRINCIPAL ================= */}
+      {/* ================= CONTENIDO PRINCIPAL (AGENDA A LA DERECHA) ================= */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#0B0D12]">
         
         <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
-            <button className="text-slate-500 dark:text-slate-400 hover:text-cyan-600 md:hidden" onClick={() => setIsSidebarOpen(true)}><Menu size={24} /></button>
-            <button className="hidden md:flex p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={20} /></button>
+            <button className="text-slate-500 dark:text-slate-400 hover:text-cyan-600 md:hidden" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={24} />
+            </button>
+            <button className="hidden md:flex p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}>
+              <PanelLeft size={20} />
+            </button>
           </div>
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-yellow-400 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 transition-colors">
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -282,7 +344,7 @@ export default function Agendas() {
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
             
-            {/* Cabecera de Agenda */}
+            {/* Cabecera de Agenda y Menús Desplegables */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Agenda</h2>
@@ -307,6 +369,7 @@ export default function Agendas() {
                   </button>
                 </div>
 
+                {/* MENÚ DESPLEGABLE 1: SEMANA/MES */}
                 <select 
                   value={viewMode} 
                   onChange={(e) => setViewMode(e.target.value)} 
@@ -316,6 +379,7 @@ export default function Agendas() {
                   <option value="Mes">Mes</option>
                 </select>
 
+                {/* MENÚ DESPLEGABLE 2: CONSULTORIOS */}
                 <div className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-sm hidden md:flex">
                   <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">CONSUL.</span>
                   <select className="text-sm font-bold bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 border-none">
@@ -386,19 +450,25 @@ export default function Agendas() {
                         </div>
                         
                         <div className="flex-1 p-2 space-y-3 relative group">
-                          {citasDia.length === 0 ? (
+                          {loading ? (
+                             <div className="animate-pulse h-16 bg-slate-200 dark:bg-white/5 rounded-xl w-full"></div>
+                          ) : citasDia.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
                                <Clock className="text-slate-300 dark:text-white/10 mb-2" size={24} />
                             </div>
                           ) : (
                             citasDia.map(c => (
-                              <div key={c.id} className="bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden">
+                              <div 
+                                key={c.id} 
+                                onClick={() => setSelectedCita(c)}
+                                className={`bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 cursor-pointer relative overflow-hidden ${getStatusColor(c.estado)}`}
+                              >
                                 <div className="flex items-center gap-2 mb-1.5">
-                                  <div className={`w-2 h-2 rounded-full ${getStatusColor(c.estado)}`}></div>
-                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatHora(c.fecha_hora)}</span>
+                                  <div className={`w-2 h-2 rounded-full ${getStatusColorSolid(c.estado)}`}></div>
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatHora(c.fecha_consulta)}</span>
                                 </div>
                                 <p className="text-[13px] font-bold text-slate-900 dark:text-white truncate">{c.pacientes?.nombres} {c.pacientes?.apellidos}</p>
-                                <p className="text-[10px] text-slate-500 mt-1 truncate">{c.consultorio}</p>
+                                <p className="text-[10px] text-slate-500 mt-1 truncate">{c.motivo || c.estado}</p>
                               </div>
                             ))
                           )}
@@ -412,14 +482,12 @@ export default function Agendas() {
               {/* === VISTA MES === */}
               {viewMode === 'Mes' && (
                 <div className="min-w-[900px]">
-                  {/* Días de la semana Header */}
                   <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#161616]">
                     {['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'].map(d => (
                       <div key={d} className="py-4 text-center text-[11px] font-bold text-slate-400 tracking-widest">{d}</div>
                     ))}
                   </div>
                   
-                  {/* Grilla de días */}
                   <div className="grid grid-cols-7 auto-rows-fr">
                     {monthDays.map((dia, idx) => {
                       const isHoy = isToday(dia);
@@ -427,11 +495,11 @@ export default function Agendas() {
                       const citasDia = getCitasParaDia(dia);
                       
                       return (
-                        <div key={idx} className={`min-h-[140px] border-b border-r border-slate-100 dark:border-white/5 p-2 transition-colors ${!isCurrentMonth ? 'bg-slate-50/50 dark:bg-black/20' : 'bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'} ${isHoy ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50/10' : ''}`}>
+                        <div key={idx} className={`min-h-[140px] border-b border-r border-slate-100 dark:border-white/5 p-2 transition-colors ${!isCurrentMonth ? 'bg-slate-50/50 dark:bg-black/20' : 'bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'} ${isHoy ? 'border-cyan-300 dark:border-cyan-500/50 bg-cyan-50/10' : ''}`}>
                           <div className="flex justify-between items-start mb-2">
-                            <div></div> {/* Spacer */}
+                            <div></div> 
                             <div className="flex items-center gap-2">
-                              {isHoy && <span className="bg-amber-400 text-amber-900 text-[9px] font-black px-1.5 py-0.5 rounded">HOY</span>}
+                              {isHoy && <span className="bg-[#0081a7] text-white text-[9px] font-black px-1.5 py-0.5 rounded">HOY</span>}
                               <div className={`w-7 h-7 flex items-center justify-center rounded-full font-bold text-sm ${isHoy ? 'bg-[#0081a7] text-white' : !isCurrentMonth ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-200'}`}>
                                 {dia.getDate()}
                               </div>
@@ -440,14 +508,18 @@ export default function Agendas() {
 
                           <div className="space-y-1.5">
                             {citasDia.slice(0, 3).map(c => (
-                              <div key={c.id} className="flex items-center justify-between group cursor-pointer">
+                              <div 
+                                key={c.id} 
+                                onClick={() => setSelectedCita(c)}
+                                className="flex items-center justify-between group cursor-pointer"
+                              >
                                 <div className="flex items-center gap-1.5 overflow-hidden">
-                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColor(c.estado)}`}></div>
+                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColorSolid(c.estado)}`}></div>
                                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate group-hover:text-[#0081a7] dark:group-hover:text-cyan-400 transition-colors">
                                     {c.pacientes?.nombres.split(' ')[0]} {c.pacientes?.apellidos.charAt(0)}.
                                   </span>
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-medium shrink-0">{formatHora(c.fecha_hora)}</span>
+                                <span className="text-[10px] text-slate-400 font-medium shrink-0">{formatHora(c.fecha_consulta)}</span>
                               </div>
                             ))}
                             {citasDia.length > 3 && (
@@ -495,8 +567,8 @@ export default function Agendas() {
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Estado</label>
                       <select value={nuevaCita.estado} onChange={(e) => setNuevaCita({...nuevaCita, estado: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all">
-                        <option value="Pendiente">Pendiente</option>
-                        <option value="Confirmada">Confirmada</option>
+                        <option value="Agendada">Agendada (Pendiente)</option>
+                        <option value="En Espera">En Espera (En Sala)</option>
                         <option value="Cancelada">Cancelada</option>
                       </select>
                     </div>
@@ -528,6 +600,80 @@ export default function Agendas() {
                 <button type="submit" form="formNuevaCita" disabled={guardando} className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-2.5 rounded-xl font-bold shadow-md disabled:opacity-50 text-sm flex items-center gap-2">
                   {guardando ? 'Guardando...' : <><Check size={16}/> Guardar cita</>}
                 </button>
+              </div>
+
+           </div>
+        </div>
+      )}
+
+      {/* ================= MODAL DETALLE Y REMITIR CITA ================= */}
+      {selectedCita && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+           <div className="bg-white dark:bg-[#111111] w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col">
+              
+              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Clock className="text-cyan-500" size={20}/> Detalle de la Cita
+                </h2>
+                <button onClick={() => setSelectedCita(null)} className="p-2 text-slate-400 hover:text-rose-500 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-full transition-colors"><X size={18} /></button>
+              </div>
+              
+              <div className="p-6 space-y-5">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paciente</p>
+                  <p className="text-lg font-black text-slate-900 dark:text-white">{selectedCita.pacientes?.nombres} {selectedCita.pacientes?.apellidos}</p>
+                  <p className="text-sm font-medium text-slate-500">C.I: {selectedCita.pacientes?.cedula}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Fecha y Hora</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                      {new Date(selectedCita.fecha_consulta).toLocaleDateString('es-ES')}
+                    </p>
+                    <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">
+                      {formatHora(selectedCita.fecha_consulta)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Estado</p>
+                    <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide ${getStatusColorSolid(selectedCita.estado)} text-white`}>
+                      {selectedCita.estado}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Motivo / Notas</p>
+                  <div className="bg-slate-50 dark:bg-[#1a1a1a] p-4 rounded-xl border border-slate-200 dark:border-white/5 text-sm text-slate-600 dark:text-slate-300 min-h-[80px]">
+                    {selectedCita.motivo || 'Sin notas adicionales.'}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+                {/* BOTÓN MAGICO DE REMITIR */}
+                {selectedCita.estado === 'Agendada' && (
+                  <button 
+                    onClick={() => handleRemitirMedico(selectedCita.id)} 
+                    disabled={remitiendo}
+                    className="w-full bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-3 rounded-xl font-bold shadow-md disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-transform hover:-translate-y-1"
+                  >
+                    {remitiendo ? 'Remitiendo...' : 'Remitir a Sala de Espera'}
+                  </button>
+                )}
+
+                {/* MENSAJES SI YA PASÓ */}
+                {selectedCita.estado === 'En Espera' && (
+                   <p className="text-sm text-amber-600 dark:text-amber-400 font-bold w-full text-center bg-amber-50 dark:bg-amber-500/10 py-3 rounded-xl border border-amber-200 dark:border-amber-500/20">
+                     El paciente ya está en sala de espera.
+                   </p>
+                )}
+                {selectedCita.estado === 'En Consulta' && (
+                   <p className="text-sm text-emerald-600 dark:text-emerald-400 font-bold w-full text-center bg-emerald-50 dark:bg-emerald-500/10 py-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
+                     El paciente está siendo atendido.
+                   </p>
+                )}
               </div>
 
            </div>
