@@ -278,7 +278,7 @@ export default function Register() {
                       `}
                     >
                       <option value="especialista">Médico Especialista</option>
-                      <option value="departamento">Asistente (Dpto. de Admisión)</option>
+                      <option value="departamento">Asistente (Depto. Historias Clinicas)</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
                       <ChevronDown size={18} />

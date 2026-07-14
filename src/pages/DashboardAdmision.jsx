@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Users, Calendar, LogOut, Menu, Sun, Moon, 
-  X, PanelLeft, Activity, Clock, ChevronDown, FileText, UserPlus, Save, Search
+  Home, Users, FileText, Calendar, User, Settings, LogOut, 
+  Menu, Sun, Moon, PanelLeft, Activity, Clock, ChevronDown, UserPlus, Save, Search, X
 } from 'lucide-react';
 
 export default function DashboardAdmision() {
@@ -36,7 +36,6 @@ export default function DashboardAdmision() {
   const [listaMedicos, setListaMedicos] = useState([]);
 
   // ================= LA ÚNICA FUENTE DE VERDAD =================
-  // Todo se guarda directamente aquí. Nada de variables dobles.
   const [triajeData, setTriajeData] = useState({
     id_paciente: '',
     id_medico: '',
@@ -87,7 +86,7 @@ export default function DashboardAdmision() {
     if (todosLosUsuarios) {
       const soloMedicos = todosLosUsuarios.filter(user => 
         user.rol === 'especialista' || 
-        (user.especialidad && user.especialidad !== 'Admisión / Triaje')
+        (user.especialidad && user.especialidad !== 'Admisión / Triaje' && user.especialidad !== 'Departamento de Historias Clínicas')
       );
       setListaMedicos(soloMedicos.filter(m => m.id_auth !== session.user.id));
     }
@@ -103,7 +102,7 @@ export default function DashboardAdmision() {
   };
 
   const getInitials = () => {
-    if (!userData) return "AD";
+    if (!userData) return "AS";
     return `${userData.nombres?.charAt(0)}${userData.apellidos?.charAt(0)}`.toUpperCase();
   };
 
@@ -144,7 +143,6 @@ export default function DashboardAdmision() {
 
       alert('¡Paciente registrado exitosamente!');
       
-      // Actualizamos la lista y SELECCIONAMOS automáticamente
       setListaPacientes(prev => [...prev, data].sort((a, b) => a.nombres.localeCompare(b.nombres)));
       setTriajeData(prev => ({ ...prev, id_paciente: data.id }));
       
@@ -182,21 +180,21 @@ export default function DashboardAdmision() {
 
       if (error) throw error;
 
-      alert('¡Paciente enviado a la Sala de Espera del Especialista con éxito!');
+      alert('¡Ficha enviada a la Sala de Espera del Especialista con éxito!');
       
       setTriajeData({ id_paciente: '', id_medico: '', motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
       fetchData(); 
       
     } catch (error) {
-      alert("Error al guardar triaje: " + error.message);
+      alert("Error al guardar ficha: " + error.message);
     } finally {
       setGuardando(false);
     }
   };
 
-  // Buscamos los datos completos para pintarlos en la hoja
-  const pacienteSeleccionado = listaPacientes.find(p => String(p.id) === String(triajeData.id_paciente));
-  const medicoSeleccionado = listaMedicos.find(m => String(m.id_auth || m.id) === String(triajeData.id_medico));
+  // Extraemos los datos completos solo para mostrarlos en la UI
+  const pacienteActivo = listaPacientes.find(p => String(p.id) === String(triajeData.id_paciente));
+  const medicoActivo = listaMedicos.find(m => String(m.id_auth || m.id) === String(triajeData.id_medico));
 
   // Filtros
   const pacientesFiltrados = listaPacientes.filter(p => 
@@ -215,8 +213,11 @@ export default function DashboardAdmision() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
+    <div className="flex h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
+      {/* OVERLAY LATERAL PARA MOVILES */}
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
+
       {/* ========================================================================= */}
       {/* MODAL DE REGISTRO RÁPIDO DE PACIENTE */}
       {/* ========================================================================= */}
@@ -229,7 +230,7 @@ export default function DashboardAdmision() {
                 <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <UserPlus className="text-[#2563eb]" size={24} /> Registrar Nuevo Paciente
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">Crea la ficha para enviarlo a consulta.</p>
+                <p className="text-sm text-slate-500 mt-1">Crea la ficha para el historial clínico.</p>
               </div>
               <button onClick={() => setShowRegistroModal(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-100 dark:bg-white/5 rounded-full transition-colors">
                 <X size={20} />
@@ -238,44 +239,42 @@ export default function DashboardAdmision() {
 
             <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar-gruesa">
               <form id="formNuevoPaciente" onSubmit={handleRegistrarPaciente} className="space-y-4">
-                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Nombres</label>
-                    <input type="text" name="nombres" required value={nuevoPaciente.nombres} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. Juan Carlos" />
+                    <input type="text" name="nombres" required value={nuevoPaciente.nombres} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. Juan Carlos" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Apellidos</label>
-                    <input type="text" name="apellidos" required value={nuevoPaciente.apellidos} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. Pérez Gómez" />
+                    <input type="text" name="apellidos" required value={nuevoPaciente.apellidos} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. Pérez Gómez" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Cédula</label>
-                    <input type="text" name="cedula" required value={nuevoPaciente.cedula} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. 12345678" />
+                    <input type="text" name="cedula" required value={nuevoPaciente.cedula} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. 12345678" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Teléfono</label>
-                    <input type="text" name="telefono" value={nuevoPaciente.telefono} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" placeholder="Ej. 04141234567" />
+                    <input type="text" name="telefono" value={nuevoPaciente.telefono} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. 04141234567" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Fec. Nacimiento</label>
-                    <input type="date" name="fecha_nacimiento" value={nuevoPaciente.fecha_nacimiento} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all" />
+                    <input type="date" name="fecha_nacimiento" value={nuevoPaciente.fecha_nacimiento} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Sexo</label>
-                    <select name="sexo" value={nuevoPaciente.sexo} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] outline-none transition-all">
+                    <select name="sexo" value={nuevoPaciente.sexo} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all">
                       <option value="">Seleccionar...</option>
                       <option value="Masculino">Masculino</option>
                       <option value="Femenino">Femenino</option>
                     </select>
                   </div>
                 </div>
-
               </form>
             </div>
 
@@ -292,51 +291,131 @@ export default function DashboardAdmision() {
         </div>
       )}
 
-      {/* ================= HEADER SUPERIOR ================= */}
-      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-slate-200/60 dark:border-white/[0.04] bg-white/40 dark:bg-[#0B0D12]/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
-        <div className="flex items-center gap-4">
-          <img src={isDarkMode ? "/soma_logo_blanco.png" : "/soma_logo.png"} alt="SOMA" className="h-7 object-contain" />
-          <div className="h-6 w-px bg-slate-300 dark:bg-white/10 hidden sm:block"></div>
-          <span className="hidden sm:block text-xs font-black tracking-widest text-slate-500 uppercase">Módulo de Admisión</span>
-        </div>
-
-        <div className="flex items-center gap-4 lg:gap-6">
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{userData?.nombres} {userData?.apellidos}</p>
-              <p className="text-[10px] text-[#b0ff4c] font-black tracking-widest uppercase">Asistente</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-[#16161a] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white flex items-center justify-center font-bold shadow-sm">
-              {getInitials()}
-            </div>
+      {/* ================= SIDEBAR ================= */}
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 
+          bg-white dark:bg-[#16161a] 
+          border-r border-slate-200/80 dark:border-white/[0.04] 
+          flex flex-col justify-between 
+          transform transition-all duration-300 ease-in-out 
+          md:relative md:translate-x-0
+          md:m-4 md:mr-0 md:rounded-3xl 
+          shadow-xl shadow-slate-200/50 dark:shadow-none
+          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
+          ${isCollapsed ? 'md:w-24' : 'md:w-68'}
+        `}>
+        <div>
+          <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
+            <Link to="/admision" className="flex items-center overflow-hidden whitespace-nowrap">
+              {isCollapsed ? (
+                <span className="text-blue-500 text-3xl mb-1 font-black">*</span>
+              ) : (
+                <>
+                  <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
+                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
+                </>
+              )}
+            </Link>
+            {!isCollapsed && (
+              <button className="md:hidden text-slate-400 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}>
+                <X size={20} />
+              </button>
+            )}
           </div>
 
-          <button onClick={handleLogout} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all border border-rose-500/20">
-            <LogOut size={16} /> <span className="hidden sm:inline">Salir</span>
-          </button>
-          
-          <div className="w-px h-6 bg-slate-300 dark:bg-white/10 hidden sm:block"></div>
+          <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
+            <nav className="space-y-1.5">
+              <Link to="/admision" className={`flex items-center gap-3 py-3 bg-blue-500/10 dark:bg-white/10 text-blue-600 dark:text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Home size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
+              </Link>
+              <Link to="/pacientes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Users size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Pacientes</span>}
+              </Link>
+              <Link to="/historias" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <FileText size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Historias Clínicas</span>}
+              </Link>
+              <Link to="/agenda" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Calendar size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
+              </Link>
+              <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Activity size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadísticas</span>}
+              </Link>
+            </nav>
+          </div>
 
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-[#b0ff4c] bg-white dark:bg-[#16161a] border dark:border-white/[0.04] rounded-xl shadow-sm transition-all">
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
+            <nav className="space-y-1.5">
+              <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <User size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
+              </Link>
+              <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+                <Settings size={20} className="shrink-0" />
+                {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
+              </Link>
+            </nav>
+          </div>
+        </div>
+
+        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+          <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-white/20">
+              {getInitials()}
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Dpto. Historias</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+                  {userData?.nombres || 'Asistente'} {userData?.apellidos || ''}
+                </p>
+              </div>
+            )}
+          </div>
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-400 dark:text-slate-500 hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+            <LogOut size={18} className="shrink-0" />
+            {!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}
           </button>
         </div>
-      </header>
+      </aside>
 
       {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 overflow-y-auto w-full relative custom-scrollbar p-6 lg:p-10">
-        <div className="max-w-[1200px] mx-auto space-y-8">
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto w-full relative">
+        
+        <header className="h-20 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200/60 dark:border-white/[0.04] bg-white/40 dark:bg-transparent backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-4">
+            <button className="text-slate-500 dark:text-slate-400 hover:text-blue-600 md:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={22} />
+            </button>
+            <button className="hidden md:flex p-2.5 text-slate-400 hover:text-white rounded-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] shadow-sm" onClick={() => setIsCollapsed(!isCollapsed)}>
+              <PanelLeft size={18} />
+            </button>
+          </div>
+          
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-amber-500 dark:hover:text-yellow-400 rounded-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] shadow-sm transition-all">
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </header>
+
+        <div className="p-6 sm:p-8 max-w-[1200px] mx-auto w-full space-y-8">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                Recepción y Triaje
+                Dpto. de Historias Clínicas
               </h2>
-              <p className="text-slate-500 mt-2 text-sm sm:text-base">Llena la hoja clínica del paciente para remitirlo a la sala de espera del médico.</p>
+              <p className="text-slate-500 mt-2 text-sm sm:text-base">Gestiona el triaje inicial y remite a los pacientes con el especialista.</p>
             </div>
             
-            <div className="bg-[#b0ff4c] text-black rounded-2xl px-6 py-4 flex items-center gap-6 shadow-[0_10px_30px_rgba(176,255,76,0.15)] shrink-0">
-              <div className="w-10 h-10 bg-black text-[#b0ff4c] rounded-full flex items-center justify-center">
+            <div className="bg-[#2563eb] text-white rounded-2xl px-6 py-4 flex items-center gap-6 shadow-[0_10px_30px_rgba(37,99,235,0.2)] shrink-0">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                 <Clock size={20} />
               </div>
               <div>
@@ -354,7 +433,7 @@ export default function DashboardAdmision() {
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">SISTEMA MÉDICO SOMA</p>
-                    <p className="text-xs font-semibold text-slate-600">DEPARTAMENTO DE ADMISIÓN</p>
+                    <p className="text-xs font-semibold text-slate-600">DEPARTAMENTO DE HISTORIAS CLÍNICAS</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Forma 01-TRJ</p>
@@ -373,25 +452,27 @@ export default function DashboardAdmision() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4 relative">
                     
                     {/* ======================================================== */}
-                    {/* SELECT PACIENTE */}
+                    {/* SELECT PACIENTE (CON SOLUCIÓN Z-INDEX INTERNA) */}
                     {/* ======================================================== */}
                     <div className="relative">
                       <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
                       <button 
                         type="button"
-                        onClick={() => setOpenPacienteMenu(!openPacienteMenu)}
+                        onClick={() => { setOpenPacienteMenu(!openPacienteMenu); setOpenMedicoMenu(false); }}
                         className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
                       >
-                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteSeleccionado ? 'text-blue-900 italic' : 'text-slate-400'}`}>
-                          {pacienteSeleccionado ? `${pacienteSeleccionado.nombres} ${pacienteSeleccionado.apellidos}` : '(Clic para buscar...)'}
+                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
+                          {pacienteActivo ? `${pacienteActivo.nombres} ${pacienteActivo.apellidos}` : '(Clic para buscar...)'}
                         </span>
                         <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openPacienteMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
                       </button>
                       
                       {openPacienteMenu && (
                         <>
-                          <div className="fixed inset-0 z-[90]" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
-                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                          {/* BACKDROP LOCAL (Evita el choque de z-index con la raíz) */}
+                          <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
+                          
+                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
                             
                             <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
                               <Search size={16} className="text-slate-400 shrink-0" />
@@ -400,6 +481,7 @@ export default function DashboardAdmision() {
                                 placeholder="Buscar nombre o cédula..." 
                                 value={searchPaciente}
                                 onChange={(e) => setSearchPaciente(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
                                 className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
                                 autoFocus
                               />
@@ -408,7 +490,11 @@ export default function DashboardAdmision() {
                             <div className="p-2 border-b border-slate-200 bg-slate-50/50">
                               <button 
                                 type="button" 
-                                onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); setShowRegistroModal(true); }}
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  setOpenPacienteMenu(false); 
+                                  setShowRegistroModal(true); 
+                                }}
                                 className="w-full flex items-center justify-center gap-2 py-2 bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg font-bold text-sm transition-colors"
                               >
                                 <UserPlus size={16} /> Registrar Nuevo Paciente
@@ -420,19 +506,20 @@ export default function DashboardAdmision() {
                                 <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron pacientes.</div>
                               ) : (
                                 pacientesFiltrados.map(p => (
-                                  <div 
+                                  <button 
                                     key={p.id} 
+                                    type="button"
                                     onClick={(e) => { 
                                       e.stopPropagation();
                                       setTriajeData(prev => ({ ...prev, id_paciente: p.id })); 
                                       setOpenPacienteMenu(false); 
                                       setSearchPaciente(''); 
                                     }}
-                                    className="px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-0 font-medium flex justify-between items-center group"
+                                    className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium flex justify-between items-center group"
                                   >
                                     <span>{p.nombres} {p.apellidos}</span>
                                     <span className="opacity-50 text-xs font-normal group-hover:opacity-100 transition-opacity">C.I: {p.cedula}</span>
-                                  </div>
+                                  </button>
                                 ))
                               )}
                             </div>
@@ -442,25 +529,27 @@ export default function DashboardAdmision() {
                     </div>
 
                     {/* ======================================================== */}
-                    {/* SELECT MÉDICO */}
+                    {/* SELECT MÉDICO (CON SOLUCIÓN Z-INDEX INTERNA) */}
                     {/* ======================================================== */}
                     <div className="relative">
                       <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
                       <button 
                         type="button"
-                        onClick={() => setOpenMedicoMenu(!openMedicoMenu)}
+                        onClick={() => { setOpenMedicoMenu(!openMedicoMenu); setOpenPacienteMenu(false); }}
                         className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
                       >
-                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoSeleccionado ? 'text-blue-900 italic' : 'text-slate-400'}`}>
-                          {medicoSeleccionado ? `Dr(a). ${medicoSeleccionado.nombres} ${medicoSeleccionado.apellidos}` : '(Clic para asignar...)'}
+                        <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
+                          {medicoActivo ? `Dr(a). ${medicoActivo.nombres} ${medicoActivo.apellidos}` : '(Clic para asignar...)'}
                         </span>
                         <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openMedicoMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
                       </button>
                       
                       {openMedicoMenu && (
                         <>
-                          <div className="fixed inset-0 z-[90]" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
-                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                          {/* BACKDROP LOCAL */}
+                          <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
+                          
+                          <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
                             
                             <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
                               <Search size={16} className="text-slate-400 shrink-0" />
@@ -469,6 +558,7 @@ export default function DashboardAdmision() {
                                 placeholder="Buscar médico o especialidad..." 
                                 value={searchMedico}
                                 onChange={(e) => setSearchMedico(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
                                 className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400"
                                 autoFocus
                               />
@@ -479,18 +569,19 @@ export default function DashboardAdmision() {
                                 <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron médicos.</div>
                               ) : (
                                 medicosFiltrados.map(m => (
-                                  <div 
+                                  <button 
                                     key={m.id_auth || m.id} 
+                                    type="button"
                                     onClick={(e) => { 
                                       e.stopPropagation();
                                       setTriajeData(prev => ({ ...prev, id_medico: m.id_auth || m.id })); 
                                       setOpenMedicoMenu(false); 
                                       setSearchMedico('');
                                     }}
-                                    className="px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 cursor-pointer transition-colors border-b border-slate-100 last:border-0 font-medium"
+                                    className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium"
                                   >
-                                    Dr(a). {m.nombres} {m.apellidos} <span className="opacity-50 text-xs ml-1 font-normal">- {m.especialidad || 'Especialista'}</span>
-                                  </div>
+                                    Dr(a). {m.nombres} {m.apellidos} <span className="opacity-50 text-xs ml-1 font-normal block sm:inline mt-1 sm:mt-0">- {m.especialidad || 'Especialista'}</span>
+                                  </button>
                                 ))
                               )}
                             </div>
@@ -597,15 +688,13 @@ export default function DashboardAdmision() {
       </main>
 
       <style>{`
-        /* SCROLLBAR GENERAL DEL SISTEMA */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
         
-        /* SCROLLBAR SÚPER VISIBLE PARA LOS MENÚS DESPLEGABLES */
         .custom-scrollbar-gruesa::-webkit-scrollbar { width: 12px; }
-        .custom-scrollbar-gruesa::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 0 0 6px 0; }
-        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 6px; border: 3px solid #f1f5f9; }
+        .custom-scrollbar-gruesa::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 0 0 10px 10px; }
+        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; border: 3px solid #f1f5f9; }
         .custom-scrollbar-gruesa::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
         
         @keyframes fadeIn {

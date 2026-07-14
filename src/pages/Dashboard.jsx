@@ -51,7 +51,7 @@ export default function Dashboard() {
         }
         setUserData(dbUser);
 
-        // BUSCAR PACIENTES ENVIADOS POR ADMISIÓN (MANTENIENDO DATOS DEL DEPARTAMENTO)
+        // BUSCAR PACIENTES ENVIADOS POR ADMISIÓN
         const { data: consultasPendientes } = await supabase
           .from('consultas')
           .select(`
@@ -105,23 +105,19 @@ export default function Dashboard() {
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
 
-  // Función cuando el médico decide atender la hoja
   const handleAtenderPaciente = async () => {
     if (!hojaSeleccionada) return;
     
-    // Cambiamos el estado para sacarlo de la sala de espera
     await supabase
       .from('consultas')
       .update({ estado: 'En Consulta' })
       .eq('id', hojaSeleccionada.id);
 
-    // Cerramos la hoja y mandamos al módulo de historias completas
     const consultaId = hojaSeleccionada.id;
     setHojaSeleccionada(null);
     navigate(`/historias?consulta=${consultaId}`);
   };
 
-  // Formateador de Hora Exacta
   const formatearHoraExacta = (fechaIso) => {
     if (!fechaIso) return '';
     const fecha = new Date(fechaIso);
@@ -153,7 +149,6 @@ export default function Dashboard() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="w-full max-w-3xl max-h-[90vh] flex flex-col">
             
-            {/* Controles arriba de la hoja */}
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg flex items-center gap-2">
                 <FileText className="text-[#b0ff4c]" /> Hoja de Admisión Recibida
@@ -163,7 +158,6 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* LA HOJA DE PAPEL FÍSICA (DISEÑO INTACTO) */}
             <div className="bg-[#F8F7F4] text-slate-900 border border-[#D5D0C6] rounded-md shadow-2xl flex-1 overflow-y-auto custom-scrollbar relative">
               
               <div className="p-8 pb-4 border-b-2 border-slate-400 bg-[#F8F7F4] sticky top-0 z-10">
@@ -235,7 +229,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Botón de Acción del Médico */}
             <div className="mt-4 flex justify-end">
               <button 
                 onClick={handleAtenderPaciente}
@@ -364,48 +357,47 @@ export default function Dashboard() {
 
         <div className="p-6 sm:p-8 max-w-[1400px] mx-auto w-full space-y-10">
           
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                {saludo} Dr(a). {userData?.apellidos || 'Gómez'}!
+          {/* ================= SALUDO Y MUÑECA (FLEX-ROW) ================= */}
+          <div className="flex flex-row items-center justify-between gap-4">
+            <div className="flex-1">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
+                {saludo} <br className="hidden sm:block" />
+                Dr(a). {userData?.apellidos || 'Gómez'}!
               </h2>
+            </div>
+            
+            <div className="shrink-0">
+              <img 
+                src="/ruta-mascota-doctora-der.svg" 
+                alt="Doctora SOMA" 
+                className="w-20 sm:w-28 md:w-32 drop-shadow-[0_10px_15px_rgba(0,0,0,0.3)] pointer-events-none transition-transform hover:scale-105" 
+              />
             </div>
           </div>
 
+          {/* ================= BOTONES COMPACTOS ================= */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              <Link to="/pacientes" className="flex items-center justify-center gap-3 p-20 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
-                <UserPlus size={28} />
-                <span className="text-xl">Crear Paciente</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 relative">
+              <Link to="/pacientes" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
+                <UserPlus size={20} />
+                <span className="text-sm sm:text-base">Crear Paciente</span>
               </Link>
               
-              <Link to="/historias" className="flex items-center justify-center gap-3 p-20 bg-[#10b981] hover:bg-[#059669] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
-                <FilePlus size={28} />
-                <span className="text-xl">Crear Consulta</span>
+              <Link to="/historias" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#10b981] hover:bg-[#059669] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
+                <FilePlus size={20} />
+                <span className="text-sm sm:text-base">Crear Consulta</span>
               </Link>
               
-              <div className="relative flex w-full h-full">
-                <img 
-                  src="/ruta-mascota-doctora-der.svg" 
-                  alt="Doctora SOMA" 
-                  className="absolute bottom-full right-2 md:right-4 mb-4 w-20 md:w-28 z-20 pointer-events-none drop-shadow-2xl" 
-                />
-                <Link to="/agenda" className="w-full flex items-center justify-center gap-3 p-20 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-lg hover:-translate-y-1">
-                  <CalendarPlus size={28} />
-                  <span className="text-xl relative z-10">Agendar Cita</span>
-                </Link>
-              </div>
-
+              <Link to="/agenda" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
+                <CalendarPlus size={20} />
+                <span className="text-sm sm:text-base">Agendar Cita</span>
+              </Link>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* ============================================================== */}
-            {/* SALA DE ESPERA INTERACTIVA (AQUÍ CAEN LOS PACIENTES) */}
-            {/* ============================================================== */}
             <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
               <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
@@ -433,7 +425,6 @@ export default function Dashboard() {
                           <h4 className="font-bold text-slate-900 dark:text-white text-lg">
                             {consulta.pacientes?.nombres} {consulta.pacientes?.apellidos}
                           </h4>
-                          {/* ETIQUETA DE LA HORA EXACTA Y FORMATO AM/PM */}
                           <span className="text-[10px] text-slate-500 font-bold bg-slate-200 dark:bg-white/5 px-2 py-1 rounded-md flex items-center gap-1 border border-slate-300 dark:border-white/5">
                             <Clock size={10} /> Ingresado: {formatearHoraExacta(consulta.fecha_consulta)}
                           </span>
