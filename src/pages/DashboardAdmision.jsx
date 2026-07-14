@@ -89,7 +89,6 @@ export default function DashboardAdmision() {
     }
     setUserData(dbUser);
 
-    // OBTENER CITAS DESDE HOY EN ADELANTE
     const hoyInicio = new Date();
     hoyInicio.setHours(0,0,0,0);
 
@@ -298,8 +297,7 @@ export default function DashboardAdmision() {
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
       
-      {openPacienteMenu && <div className="fixed inset-0 z-[90]" onClick={() => setOpenPacienteMenu(false)}></div>}
-      {openMedicoMenu && <div className="fixed inset-0 z-[90]" onClick={() => setOpenMedicoMenu(false)}></div>}
+      {/* CAPA OSCURA PARA EL MENÚ EN MÓVILES */}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
 
       {/* ================= MODAL REGISTRO DE PACIENTE ================= */}
@@ -423,10 +421,7 @@ export default function DashboardAdmision() {
                 <Calendar size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
               </Link>
-              <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Activity size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadísticas</span>}
-              </Link>
+             
             </nav>
           </div>
 
@@ -437,10 +432,7 @@ export default function DashboardAdmision() {
                 <User size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
               </Link>
-              <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Settings size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
-              </Link>
+            
             </nav>
           </div>
         </div>
@@ -490,7 +482,6 @@ export default function DashboardAdmision() {
           {vistaActual === 'inicio' && (
             <div className="space-y-10 animate-[fadeIn_0.3s_ease-out]">
               
-              {/* ================= SALUDO Y MUÑECA ================= */}
               <div className="flex flex-row items-center justify-between gap-4">
                 <div className="flex-1">
                   <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
@@ -508,7 +499,6 @@ export default function DashboardAdmision() {
                 </div>
               </div>
 
-              {/* ================= BOTONES COMPACTOS (Estilo Doctor) ================= */}
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 relative">
@@ -529,10 +519,8 @@ export default function DashboardAdmision() {
                 </div>
               </div>
 
-              {/* ================= PANELES GEMELOS (Hoy vs Próximas) ================= */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* PANEL 1: Citas de Hoy (Recepción) */}
                 <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
                   <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
                     <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
@@ -595,7 +583,6 @@ export default function DashboardAdmision() {
                   </div>
                 </div>
 
-                {/* PANEL 2: Próximas Citas */}
                 <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
                   <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
                     <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
@@ -678,13 +665,13 @@ export default function DashboardAdmision() {
                 </div>
                 
                 <div className="px-8 pb-8">
-                  <form id="formTriaje" onSubmit={handleGuardarTriaje} className="space-y-8">
+                  <form id="formTriaje" onSubmit={handleGuardarTriaje} className="space-y-8 relative">
                     
-                    {/* FILA 1: PACIENTE Y MÉDICO (Z-Index alto asegurado) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4 relative z-[100]">
+                    {/* FILA 1: PACIENTE Y MÉDICO */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4">
                       
                       {/* DROPDOWN PACIENTE */}
-                      <div className="relative">
+                      <div className={`relative ${openPacienteMenu ? 'z-50' : 'z-10'}`}>
                         <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
                         <button 
                           type="button"
@@ -699,18 +686,27 @@ export default function DashboardAdmision() {
                         
                         {openPacienteMenu && (
                           <>
-                            <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
-                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                            <div className="fixed inset-0 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
+                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-10 flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
                               <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
                                 <Search size={16} className="text-slate-400 shrink-0" />
-                                <input type="text" placeholder="Buscar nombre o cédula..." value={searchPaciente} onChange={(e) => setSearchPaciente(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" autoFocus />
+                                <input 
+                                  type="text" 
+                                  placeholder="Buscar nombre o cédula..." 
+                                  value={searchPaciente} 
+                                  onChange={(e) => setSearchPaciente(e.target.value)} 
+                                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                                  onClick={(e) => e.stopPropagation()} 
+                                  className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" 
+                                  autoFocus 
+                                />
                               </div>
                               <div className="p-2 border-b border-slate-200 bg-slate-50/50">
                                 <button type="button" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); setShowRegistroModal(true); }} className="w-full flex items-center justify-center gap-2 py-2 bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg font-bold text-sm transition-colors">
                                   <UserPlus size={16} /> Registrar Nuevo Paciente
                                 </button>
                               </div>
-                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-[110]">
+                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-20">
                                 {pacientesFiltrados.length === 0 ? (
                                   <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron pacientes.</div>
                                 ) : (
@@ -739,8 +735,8 @@ export default function DashboardAdmision() {
                         )}
                       </div>
 
-                      {/* DROPDOWN MÉDICO (Blindado) */}
-                      <div className="relative">
+                      {/* DROPDOWN MÉDICO */}
+                      <div className={`relative ${openMedicoMenu ? 'z-50' : 'z-10'}`}>
                         <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
                         <button 
                           type="button"
@@ -755,13 +751,22 @@ export default function DashboardAdmision() {
                         
                         {openMedicoMenu && (
                           <>
-                            <div className="fixed inset-0 z-[90] cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
-                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-[100] flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
+                            <div className="fixed inset-0 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
+                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-10 flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
                               <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
                                 <Search size={16} className="text-slate-400 shrink-0" />
-                                <input type="text" placeholder="Buscar médico..." value={searchMedico} onChange={(e) => setSearchMedico(e.target.value)} onClick={(e) => e.stopPropagation()} className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" autoFocus />
+                                <input 
+                                  type="text" 
+                                  placeholder="Buscar médico..." 
+                                  value={searchMedico} 
+                                  onChange={(e) => setSearchMedico(e.target.value)} 
+                                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                                  onClick={(e) => e.stopPropagation()} 
+                                  className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" 
+                                  autoFocus 
+                                />
                               </div>
-                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-[110]">
+                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-20">
                                 {medicosFiltrados.length === 0 ? (
                                   <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron médicos.</div>
                                 ) : (
@@ -791,7 +796,7 @@ export default function DashboardAdmision() {
                     </div>
 
                     {/* FILA 2: FECHA Y HORA DE LA CITA */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-2 relative z-[80]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-2">
                       <div>
                         <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">FECHA DE LA CITA</span>
                         <input 
@@ -816,7 +821,7 @@ export default function DashboardAdmision() {
                       </div>
                     </div>
 
-                    <div className="pt-2 relative z-10">
+                    <div className="pt-2">
                       <div className="mb-4 border-b border-slate-400 pb-1">
                         <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
                           1.- Examen Funcional / Síntomas Rápidos
@@ -824,7 +829,7 @@ export default function DashboardAdmision() {
                       </div>
                       <div className="grid grid-cols-2 gap-x-8 gap-y-3 pl-2">
                         {listaSintomasIVSS.map((sintoma) => (
-                          <label key={sintoma.id} className="flex items-center gap-3 cursor-pointer group">
+                          <label key={sintoma.id} className="flex items-center gap-3 cursor-pointer group w-max">
                             <div className="relative flex items-center justify-center w-5 h-5 border border-slate-500 bg-white group-hover:border-slate-800 transition-colors">
                               <input type="checkbox" className="opacity-0 absolute" checked={triajeData.sintomasRapidos.includes(sintoma.label)} onChange={() => handleCheckboxChange(sintoma.label)} />
                               {triajeData.sintomasRapidos.includes(sintoma.label) && <span className="text-blue-900 font-serif font-black text-sm leading-none select-none italic">X</span>}
@@ -837,7 +842,7 @@ export default function DashboardAdmision() {
                       </div>
                     </div>
 
-                    <div className="pt-2 relative z-10">
+                    <div className="pt-2">
                       <div className="mb-4 border-b border-slate-400 pb-1">
                         <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
                           2.- Signos Vitales
@@ -864,7 +869,7 @@ export default function DashboardAdmision() {
                       </div>
                     </div>
 
-                    <div className="pt-2 relative z-10">
+                    <div className="pt-2">
                       <div className="mb-4 border-b border-slate-400 pb-1">
                         <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
                           3.- Motivo de la Consulta / Notas
@@ -890,7 +895,7 @@ export default function DashboardAdmision() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end relative z-10 pb-10">
+              <div className="mt-6 flex justify-end pb-10">
                 <button 
                   type="submit"
                   form="formTriaje"

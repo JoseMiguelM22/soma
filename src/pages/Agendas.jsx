@@ -31,9 +31,11 @@ export default function Agendas() {
     consultorio: '', titulo: '', notas: ''
   });
 
-  // ================= MODAL DETALLE DE CITA (NUEVO) =================
+  // ================= MODAL DETALLE DE CITA =================
   const [selectedCita, setSelectedCita] = useState(null);
   const [remitiendo, setRemitiendo] = useState(false);
+  const [nuevoEstado, setNuevoEstado] = useState('');
+  const [actualizandoEstado, setActualizandoEstado] = useState(false);
 
   const listaConsultorios = ["Medics", "SOMA Principal"];
 
@@ -51,7 +53,6 @@ export default function Agendas() {
     const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
     if (dbUser) setUserData(dbUser);
     
-    // Cargar pacientes para el select del modal
     let queryPacientes = supabase.from('pacientes').select('*').order('nombres', { ascending: true });
     if (dbUser?.rol === 'especialista') {
       queryPacientes = queryPacientes.eq('id_medico', session.user.id);
@@ -63,7 +64,6 @@ export default function Agendas() {
   };
 
   const cargarCitas = async (usuarioDb, authId) => {
-    // Rango de fechas amplio para ver tanto la semana como el mes
     const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
     const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
 
@@ -106,7 +106,6 @@ export default function Agendas() {
     setGuardando(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
       const fechaObj = new Date(nuevaCita.fecha_hora);
 
       const { error } = await supabase.from('consultas').insert([{
@@ -130,25 +129,73 @@ export default function Agendas() {
     }
   };
 
-  // ================= FUNCIÓN PARA REMITIR AL MÉDICO =================
+  // ================= ACTUALIZACIÓN DE ESTADOS =================
+  const openCitaDetails = (cita) => {
+    setSelectedCita(cita);
+    setNuevoEstado(cita.estado);
+  };
+
   const handleRemitirMedico = async (citaId) => {
     setRemitiendo(true);
     try {
-      const { error } = await supabase
-        .from('consultas')
-        .update({ estado: 'En Espera' })
-        .eq('id', citaId);
-      
+      const { error } = await supabase.from('consultas').update({ estado: 'En Espera' }).eq('id', citaId);
       if (error) throw error;
-      
       alert("¡Paciente remitido a la Sala de Espera del Médico!");
-      setSelectedCita(null); // Cierra el modal
-      fetchData(); // Recarga las citas para pintar el cambio de color
+      setSelectedCita(null);
+      fetchData();
     } catch (err) {
       alert("Error al remitir: " + err.message);
     } finally {
       setRemitiendo(false);
     }
+  };
+
+  const handleActualizarEstado = async (citaId) => {
+    setActualizandoEstado(true);
+    try {
+      const { error } = await supabase.from('consultas').update({ estado: nuevoEstado }).eq('id', citaId);
+      if (error) throw error;
+      alert("¡Estado de la cita actualizado!");
+      setSelectedCita(null);
+      fetchData();
+    } catch (err) {
+      alert("Error al actualizar: " + err.message);
+    } finally {
+      setActualizandoEstado(false);
+    }
+  };
+
+  // ================= INTELIGENCIA DE ESTADOS Y COLORES =================
+  const isCitaExpirada = (fechaString, estado) => {
+    const citaDate = new Date(fechaString);
+    citaDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return citaDate < today && ['Agendada', 'Pendiente', 'En Espera'].includes(estado);
+  };
+
+  const getStatusText = (cita) => {
+    if (cita.estado === 'No Asistió' || isCitaExpirada(cita.fecha_consulta, cita.estado)) return 'No Asistió';
+    if (cita.estado === 'Finalizada' || cita.estado === 'Completada') return 'Completada';
+    return cita.estado;
+  };
+
+  const getStatusColor = (cita) => {
+    const text = getStatusText(cita);
+    if (text === 'No Asistió' || text === 'Cancelada') return 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+    if (text === 'En Espera') return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+    if (text === 'En Consulta') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+    if (text === 'Completada') return 'bg-violet-500/10 border-violet-500/30 text-violet-400'; // Color Morado para finalizadas
+    return 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'; // Agendada
+  };
+
+  const getStatusColorSolid = (cita) => {
+    const text = getStatusText(cita);
+    if (text === 'No Asistió' || text === 'Cancelada') return 'bg-rose-500';
+    if (text === 'En Espera') return 'bg-amber-400';
+    if (text === 'En Consulta') return 'bg-emerald-400';
+    if (text === 'Completada') return 'bg-violet-500'; // Color Morado
+    return 'bg-cyan-400'; // Agendada
   };
 
   // ================= LÓGICA DE CALENDARIO =================
@@ -212,33 +259,18 @@ export default function Agendas() {
     return currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
   };
 
-  const isSameDay = (d1, d2) => 
-    d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  const isSameDay = (d1, d2) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
   const isToday = (d) => isSameDay(d, new Date());
   
   const getCitasParaDia = (date) => {
     return citas.filter(c => {
-      const citaDate = new Date(c.fecha_consulta);
+      const citaDate = new Date(c.fecha_consulta); 
       return isSameDay(citaDate, date);
     }).sort((a, b) => new Date(a.fecha_consulta) - new Date(b.fecha_consulta));
   };
 
   const formatHora = (fechaString) => {
     return new Date(fechaString).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false });
-  };
-
-  const getStatusColor = (estado) => {
-    if (estado === 'En Espera') return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
-    if (estado === 'En Consulta') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
-    if (estado === 'Cancelada') return 'bg-rose-500/10 border-rose-500/30 text-rose-400';
-    return 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'; // Agendada
-  };
-
-  const getStatusColorSolid = (estado) => {
-    if (estado === 'En Espera') return 'bg-amber-400';
-    if (estado === 'En Consulta') return 'bg-emerald-400';
-    if (estado === 'Cancelada') return 'bg-rose-400';
-    return 'bg-cyan-400'; // Agendada
   };
 
   return (
@@ -288,18 +320,18 @@ export default function Agendas() {
               <Link to={userData?.rol === 'especialista' ? '/dashboard' : '/admision'} className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
                 <Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}
               </Link>
-              <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
-                <Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}
-              </Link>
+              {userData?.rol !== 'especialista' && (
+                <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
+                  <Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}
+                </Link>
+              )}
               <Link to="/historias" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
                 <FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}
               </Link>
               <Link to="/agenda" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors">
                 <CalendarIcon size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}
               </Link>
-              <Link to="/estadisticas" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
-                <Activity size={20} className="shrink-0" />{!isCollapsed && <span>Estadísticas</span>}
-              </Link>
+              
             </nav>
           </div>
         </div>
@@ -324,7 +356,7 @@ export default function Agendas() {
         </div>
       </aside>
 
-      {/* ================= CONTENIDO PRINCIPAL (AGENDA A LA DERECHA) ================= */}
+      {/* ================= CONTENIDO PRINCIPAL ================= */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#0B0D12]">
         
         <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
@@ -344,14 +376,12 @@ export default function Agendas() {
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
             
-            {/* Cabecera de Agenda y Menús Desplegables */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Agenda</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-0.5">Gestiona tus consultas</p>
               </div>
 
-              {/* Controles de Calendario */}
               <div className="flex flex-wrap items-center gap-3">
                 <button onClick={goToToday} className="px-4 py-2 text-sm font-bold border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors shadow-sm">
                   Hoy
@@ -369,7 +399,6 @@ export default function Agendas() {
                   </button>
                 </div>
 
-                {/* MENÚ DESPLEGABLE 1: SEMANA/MES */}
                 <select 
                   value={viewMode} 
                   onChange={(e) => setViewMode(e.target.value)} 
@@ -379,7 +408,6 @@ export default function Agendas() {
                   <option value="Mes">Mes</option>
                 </select>
 
-                {/* MENÚ DESPLEGABLE 2: CONSULTORIOS */}
                 <div className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-sm hidden md:flex">
                   <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">CONSUL.</span>
                   <select className="text-sm font-bold bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 border-none">
@@ -394,7 +422,6 @@ export default function Agendas() {
               </div>
             </div>
 
-            {/* Banner del Enlace de Citas */}
             <div className="bg-[#f0f9ff] dark:bg-cyan-900/10 border border-cyan-100 dark:border-cyan-900/30 rounded-2xl p-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-white dark:bg-[#1a1a1a] rounded-full flex items-center justify-center shrink-0 shadow-sm border border-cyan-100 dark:border-cyan-900/30">
@@ -420,7 +447,6 @@ export default function Agendas() {
             {/* ================= CALENDARIO ================= */}
             <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden">
               
-              {/* Cabecera del Mes interno (Solo en vista Mes) */}
               {viewMode === 'Mes' && (
                 <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
                   <h3 className="text-xl font-bold text-slate-900 dark:text-white capitalize">
@@ -460,15 +486,15 @@ export default function Agendas() {
                             citasDia.map(c => (
                               <div 
                                 key={c.id} 
-                                onClick={() => setSelectedCita(c)}
-                                className={`bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 cursor-pointer relative overflow-hidden ${getStatusColor(c.estado)}`}
+                                onClick={() => openCitaDetails(c)}
+                                className={`bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 cursor-pointer relative overflow-hidden ${getStatusColor(c)}`}
                               >
                                 <div className="flex items-center gap-2 mb-1.5">
-                                  <div className={`w-2 h-2 rounded-full ${getStatusColorSolid(c.estado)}`}></div>
+                                  <div className={`w-2 h-2 rounded-full ${getStatusColorSolid(c)}`}></div>
                                   <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatHora(c.fecha_consulta)}</span>
                                 </div>
                                 <p className="text-[13px] font-bold text-slate-900 dark:text-white truncate">{c.pacientes?.nombres} {c.pacientes?.apellidos}</p>
-                                <p className="text-[10px] text-slate-500 mt-1 truncate">{c.motivo || c.estado}</p>
+                                <p className="text-[10px] text-slate-500 mt-1 truncate">{c.motivo || getStatusText(c)}</p>
                               </div>
                             ))
                           )}
@@ -510,11 +536,11 @@ export default function Agendas() {
                             {citasDia.slice(0, 3).map(c => (
                               <div 
                                 key={c.id} 
-                                onClick={() => setSelectedCita(c)}
+                                onClick={() => openCitaDetails(c)}
                                 className="flex items-center justify-between group cursor-pointer"
                               >
                                 <div className="flex items-center gap-1.5 overflow-hidden">
-                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColorSolid(c.estado)}`}></div>
+                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColorSolid(c)}`}></div>
                                   <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate group-hover:text-[#0081a7] dark:group-hover:text-cyan-400 transition-colors">
                                     {c.pacientes?.nombres.split(' ')[0]} {c.pacientes?.apellidos.charAt(0)}.
                                   </span>
@@ -550,7 +576,6 @@ export default function Agendas() {
               
               <div className="p-6 overflow-y-auto custom-scrollbar">
                 <form id="formNuevaCita" onSubmit={handleGuardarCita} className="space-y-5">
-                  
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Paciente *</label>
                     <select required value={nuevaCita.id_paciente} onChange={(e) => setNuevaCita({...nuevaCita, id_paciente: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all">
@@ -558,22 +583,21 @@ export default function Agendas() {
                       {pacientesLista.map(p => <option key={p.id} value={p.id}>{p.nombres} {p.apellidos} - {p.cedula}</option>)}
                     </select>
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha y hora *</label>
                       <input type="datetime-local" value={nuevaCita.fecha_hora} onChange={(e) => setNuevaCita({...nuevaCita, fecha_hora: e.target.value})} required className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Estado</label>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Estado Inicial</label>
                       <select value={nuevaCita.estado} onChange={(e) => setNuevaCita({...nuevaCita, estado: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all">
                         <option value="Agendada">Agendada (Pendiente)</option>
                         <option value="En Espera">En Espera (En Sala)</option>
+                        <option value="Finalizada">Finalizada (Completada)</option>
                         <option value="Cancelada">Cancelada</option>
                       </select>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Consultorio (opcional)</label>
@@ -587,7 +611,6 @@ export default function Agendas() {
                       <input type="text" value={nuevaCita.titulo} onChange={(e) => setNuevaCita({...nuevaCita, titulo: e.target.value})} placeholder="Ej. Control..." className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all" />
                     </div>
                   </div>
-
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Notas (opcional)</label>
                     <textarea rows="3" value={nuevaCita.notas} onChange={(e) => setNuevaCita({...nuevaCita, notas: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all resize-none custom-scrollbar" placeholder="Instrucciones previas o notas internas..."></textarea>
@@ -606,7 +629,7 @@ export default function Agendas() {
         </div>
       )}
 
-      {/* ================= MODAL DETALLE Y REMITIR CITA ================= */}
+      {/* ================= MODAL DETALLE Y CONTROL DE CITA ================= */}
       {selectedCita && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
            <div className="bg-white dark:bg-[#111111] w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col">
@@ -636,9 +659,9 @@ export default function Agendas() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Estado</p>
-                    <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide ${getStatusColorSolid(selectedCita.estado)} text-white`}>
-                      {selectedCita.estado}
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Estado Actual</p>
+                    <span className={`inline-block px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wide ${getStatusColorSolid(selectedCita)} text-white`}>
+                      {getStatusText(selectedCita)}
                     </span>
                   </div>
                 </div>
@@ -651,29 +674,45 @@ export default function Agendas() {
                 </div>
               </div>
               
-              <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                {/* BOTÓN MAGICO DE REMITIR */}
-                {selectedCita.estado === 'Agendada' && (
+              <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616] space-y-5">
+                
+                {/* BOTÓN RÁPIDO PARA DEPARTAMENTO */}
+                {selectedCita.estado === 'Agendada' && !isCitaExpirada(selectedCita.fecha_consulta, selectedCita.estado) && (
                   <button 
                     onClick={() => handleRemitirMedico(selectedCita.id)} 
                     disabled={remitiendo}
                     className="w-full bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-3 rounded-xl font-bold shadow-md disabled:opacity-50 text-sm flex items-center justify-center gap-2 transition-transform hover:-translate-y-1"
                   >
-                    {remitiendo ? 'Remitiendo...' : 'Remitir a Sala de Espera'}
+                    {remitiendo ? 'Remitiendo...' : 'Acción Rápida: Remitir a Sala de Espera'}
                   </button>
                 )}
 
-                {/* MENSAJES SI YA PASÓ */}
-                {selectedCita.estado === 'En Espera' && (
-                   <p className="text-sm text-amber-600 dark:text-amber-400 font-bold w-full text-center bg-amber-50 dark:bg-amber-500/10 py-3 rounded-xl border border-amber-200 dark:border-amber-500/20">
-                     El paciente ya está en sala de espera.
-                   </p>
-                )}
-                {selectedCita.estado === 'En Consulta' && (
-                   <p className="text-sm text-emerald-600 dark:text-emerald-400 font-bold w-full text-center bg-emerald-50 dark:bg-emerald-500/10 py-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
-                     El paciente está siendo atendido.
-                   </p>
-                )}
+                {/* CONTROL MANUAL DE ESTADOS */}
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Control Manual de Estado</p>
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <select 
+                      value={nuevoEstado} 
+                      onChange={(e) => setNuevoEstado(e.target.value)}
+                      className="w-full sm:flex-1 px-3 py-2.5 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-[#0081a7] transition-all"
+                    >
+                      <option value="Agendada">Agendada</option>
+                      <option value="En Espera">En Espera</option>
+                      <option value="En Consulta">En Consulta</option>
+                      <option value="Finalizada">Finalizada (Completada)</option>
+                      <option value="No Asistió">No Asistió</option>
+                      <option value="Cancelada">Cancelada</option>
+                    </select>
+                    <button 
+                      onClick={() => handleActualizarEstado(selectedCita.id)}
+                      disabled={actualizandoEstado || nuevoEstado === selectedCita.estado}
+                      className="w-full sm:w-auto bg-slate-800 hover:bg-black dark:bg-white/10 dark:hover:bg-white/20 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm disabled:opacity-50 text-sm transition-colors shrink-0"
+                    >
+                      {actualizandoEstado ? '...' : 'Actualizar'}
+                    </button>
+                  </div>
+                </div>
+
               </div>
 
            </div>

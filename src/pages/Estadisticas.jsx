@@ -216,10 +216,7 @@ export default function Estadisticas() {
                 <User size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
               </Link>
-              <Link to="/ajustes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Settings size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Ajustes</span>}
-              </Link>
+              
             </nav>
           </div>
         </div>

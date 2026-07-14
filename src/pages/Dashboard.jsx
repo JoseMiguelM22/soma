@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Home, Users, FileText, Calendar, User, Settings, LogOut, 
-  Menu, Sun, Moon, UserPlus, FilePlus, CalendarPlus, Clock, PlayCircle, X, PanelLeft, Activity, CheckCircle
+  Home, FileText, Calendar, User, Settings, LogOut, 
+  Menu, Sun, Moon, Clock, PlayCircle, X, PanelLeft, CheckCircle, XCircle, Users
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -51,7 +51,10 @@ export default function Dashboard() {
         }
         setUserData(dbUser);
 
-        // BUSCAR PACIENTES ENVIADOS POR ADMISIÓN
+        // BUSCAR PACIENTES REMITIDOS POR ADMISIÓN (En Espera o En Consulta)
+        const hoyInicio = new Date();
+        hoyInicio.setHours(0,0,0,0);
+        
         const { data: consultasPendientes } = await supabase
           .from('consultas')
           .select(`
@@ -59,11 +62,13 @@ export default function Dashboard() {
             motivo,
             signos_vitales,
             fecha_consulta,
+            estado,
             id_paciente,
             pacientes ( id, nombres, apellidos )
           `)
           .eq('id_medico', session.user.id)
-          .eq('estado', 'En Espera')
+          .in('estado', ['En Espera', 'En Consulta']) // Trae los que están esperando o ya dentro
+          .gte('fecha_consulta', hoyInicio.toISOString())
           .order('fecha_consulta', { ascending: true });
 
         if (consultasPendientes) {
@@ -105,6 +110,7 @@ export default function Dashboard() {
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
 
+  // Función para Iniciar la Consulta desde el Modal
   const handleAtenderPaciente = async () => {
     if (!hojaSeleccionada) return;
     
@@ -116,6 +122,24 @@ export default function Dashboard() {
     const consultaId = hojaSeleccionada.id;
     setHojaSeleccionada(null);
     navigate(`/historias?consulta=${consultaId}`);
+  };
+
+  // ================= FUNCIÓN NUEVA: ACTUALIZAR ESTADO DE LA CITA =================
+  const handleActualizarEstado = async (consultaId, nuevoEstado) => {
+    try {
+      const { error } = await supabase
+        .from('consultas')
+        .update({ estado: nuevoEstado })
+        .eq('id', consultaId);
+      
+      if (error) throw error;
+      
+      // Recargar la lista de pacientes en espera
+      const { data: { session } } = await supabase.auth.getSession();
+      fetchUser(session);
+    } catch (error) {
+      alert("Error al actualizar estado: " + error.message);
+    }
   };
 
   const formatearHoraExacta = (fechaIso) => {
@@ -242,7 +266,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ================= SIDEBAR ================= */}
+      {/* ================= SIDEBAR EXCLUSIVO DEL DOCTOR ================= */}
       <aside 
         className={`
           fixed inset-y-0 left-0 z-50 
@@ -282,21 +306,15 @@ export default function Dashboard() {
                 <Home size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
               </Link>
-              <Link to="/pacientes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Users size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Pacientes</span>}
-              </Link>
+              
               <Link to="/historias" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
                 <FileText size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Historias Clínicas</span>}
               </Link>
+              
               <Link to="/agenda" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
                 <Calendar size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
-              </Link>
-               <Link to="/estadisticas" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Activity size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Estadisticas</span>}
               </Link>
             </nav>
           </div>
@@ -325,7 +343,7 @@ export default function Dashboard() {
               <div className="overflow-hidden">
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Médico</p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData?.nombres || 'Miguel'} {userData?.apellidos || 'Gómez'}
+                  {userData?.nombres || ''} {userData?.apellidos || ''}
                 </p>
               </div>
             )}
@@ -357,12 +375,12 @@ export default function Dashboard() {
 
         <div className="p-6 sm:p-8 max-w-[1400px] mx-auto w-full space-y-10">
           
-          {/* ================= SALUDO Y MUÑECA (FLEX-ROW) ================= */}
+          {/* ================= SALUDO Y MUÑECA ================= */}
           <div className="flex flex-row items-center justify-between gap-4">
             <div className="flex-1">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
                 {saludo} <br className="hidden sm:block" />
-                Dr(a). {userData?.apellidos || 'Gómez'}!
+                Dr(a). {userData?.apellidos || ''}!
               </h2>
             </div>
             
@@ -375,33 +393,36 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ================= BOTONES COMPACTOS ================= */}
+          {/* ================= BOTONES COMPACTOS (EXCLUSIVOS DEL MÉDICO) ================= */}
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 relative">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 relative">
+              
               <Link to="/pacientes" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
-                <UserPlus size={20} />
-                <span className="text-sm sm:text-base">Crear Paciente</span>
+                <Users size={20} />
+                <span className="text-sm sm:text-base">Mis Pacientes</span>
               </Link>
               
               <Link to="/historias" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#10b981] hover:bg-[#059669] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
-                <FilePlus size={20} />
-                <span className="text-sm sm:text-base">Crear Consulta</span>
+                <FileText size={20} />
+                <span className="text-sm sm:text-base">Historias Remitidas</span>
               </Link>
               
               <Link to="/agenda" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
-                <CalendarPlus size={20} />
-                <span className="text-sm sm:text-base">Agendar Cita</span>
+                <Calendar size={20} />
+                <span className="text-sm sm:text-base">Mi Agenda</span>
               </Link>
+
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             
-            <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
+            {/* ================= PANEL DE SALA DE ESPERA (CON BOTONES DE ESTADO) ================= */}
+            <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-6 lg:p-8 flex flex-col shadow-sm min-h-[400px] lg:min-h-[600px] xl:min-h-[700px] transition-all">
               <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
-                  <Clock size={20} className="text-[#b0ff4c]" /> Sala de Espera (Triaje)
+                  <Clock size={20} className="text-[#b0ff4c]" /> Historias Remitidas (Sala de Espera)
                 </h3>
                 <span className="text-xs font-bold bg-[#b0ff4c]/20 text-[#b0ff4c] px-3 py-1 rounded-full">
                   {pacientesEnEspera.length} pacientes
@@ -414,22 +435,29 @@ export default function Dashboard() {
                     <Clock size={56} className="text-slate-300 dark:text-white/10 mb-4" strokeWidth={1.5} />
                     <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Sala de espera vacía</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm leading-relaxed">
-                      El departamento de admisión no te ha remitido pacientes nuevos.
+                      El departamento de admisión no te ha remitido pacientes nuevos o ya finalizaste todas tus consultas del día.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {pacientesEnEspera.map((consulta) => (
-                      <div key={consulta.id} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] hover:border-[#b0ff4c]/50 transition-colors shadow-sm">
+                      <div key={consulta.id} className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] hover:border-[#b0ff4c]/50 transition-colors shadow-sm flex flex-col">
+                        
                         <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-lg">
-                            {consulta.pacientes?.nombres} {consulta.pacientes?.apellidos}
-                          </h4>
+                          <div className="flex flex-col">
+                            <h4 className="font-bold text-slate-900 dark:text-white text-lg">
+                              {consulta.pacientes?.nombres} {consulta.pacientes?.apellidos}
+                            </h4>
+                            {consulta.estado === 'En Consulta' && (
+                               <span className="text-[10px] font-bold text-emerald-500 mt-0.5">🟢 En Consulta Actualmente</span>
+                            )}
+                          </div>
                           <span className="text-[10px] text-slate-500 font-bold bg-slate-200 dark:bg-white/5 px-2 py-1 rounded-md flex items-center gap-1 border border-slate-300 dark:border-white/5">
-                            <Clock size={10} /> Ingresado: {formatearHoraExacta(consulta.fecha_consulta)}
+                            <Clock size={10} /> Ingreso: {formatearHoraExacta(consulta.fecha_consulta)}
                           </span>
                         </div>
-                        <div className="space-y-1 mb-4">
+
+                        <div className="space-y-1 mb-4 flex-1">
                           <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
                             <span className="font-bold text-slate-800 dark:text-slate-300">Triaje:</span> {consulta.signos_vitales}
                           </p>
@@ -437,13 +465,31 @@ export default function Dashboard() {
                             <span className="font-bold text-slate-800 dark:text-slate-300">Motivo:</span> {consulta.motivo}
                           </p>
                         </div>
-                        <div className="flex gap-2 mt-auto pt-2 border-t border-slate-200 dark:border-white/5">
+
+                        {/* BOTONES DE ACCIÓN PARA EL DOCTOR */}
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2 mt-auto pt-4 border-t border-slate-200 dark:border-white/5">
+                          
                           <button 
                             onClick={() => setHojaSeleccionada(consulta)}
-                            className="w-full bg-[#16161a] hover:bg-black dark:bg-white/5 dark:hover:bg-white/10 text-white py-2.5 rounded-xl text-sm font-bold transition-all border border-slate-700 dark:border-white/10 flex justify-center items-center gap-2"
+                            className="w-full sm:flex-1 bg-[#16161a] hover:bg-black dark:bg-white/5 dark:hover:bg-white/10 text-white py-2 rounded-xl text-xs font-bold transition-all border border-slate-700 dark:border-white/10 flex justify-center items-center gap-1.5"
                           >
-                            <FileText size={16} /> Ver Hoja de Admisión
+                            <FileText size={14} /> Ver Hoja
                           </button>
+                          
+                          <button 
+                            onClick={() => handleActualizarEstado(consulta.id, 'Finalizada')}
+                            className="w-[48%] sm:flex-1 bg-emerald-100 hover:bg-emerald-500 text-emerald-700 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 py-2 rounded-xl text-xs font-bold transition-all border border-emerald-200 dark:border-emerald-500/20 flex justify-center items-center gap-1.5"
+                          >
+                            <CheckCircle size={14} /> Atendido
+                          </button>
+
+                          <button 
+                            onClick={() => handleActualizarEstado(consulta.id, 'Cancelada')}
+                            className="w-[48%] sm:flex-1 bg-rose-100 hover:bg-rose-500 text-rose-700 hover:text-white dark:bg-rose-500/10 dark:text-rose-400 py-2 rounded-xl text-xs font-bold transition-all border border-rose-200 dark:border-rose-500/20 flex justify-center items-center gap-1.5"
+                          >
+                            <XCircle size={14} /> No Asistió
+                          </button>
+
                         </div>
                       </div>
                     ))}
@@ -452,13 +498,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px]">
+            {/* ================= PANEL DE GUÍA RÁPIDA ================= */}
+            <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-6 lg:p-8 flex flex-col shadow-sm min-h-[400px] lg:min-h-[600px] xl:min-h-[700px] transition-all">
               <div className="mb-4 shrink-0">
                 <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white mb-2">
                   <PlayCircle size={20} className="text-rose-500" /> Guía rápida de SOMA
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Familiarízate con tu nuevo entorno de trabajo. Configura tu consultorio, registra pacientes y potencia tus consultas médicas en pocos pasos.
+                  Familiarízate con tu nuevo entorno de trabajo. Configura tu consultorio y potencia tus consultas médicas en pocos pasos.
                 </p>
               </div>
               
@@ -472,10 +519,17 @@ export default function Dashboard() {
                   </p>
                 </div>
 
-                  <div 
-                    className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                    style={{ backgroundImage: "url('/CE.jpg')" }}
-                  ></div>
+                <div 
+                  className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 group-hover:scale-105"
+                  style={{ backgroundImage: "url('/CE.jpg')" }}
+                ></div>
+                
+                {/* Botón Play sutil en el centro */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                   <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/20 text-white/80 group-hover:text-white group-hover:bg-black/60 transition-all group-hover:scale-110">
+                     <PlayCircle size={32} />
+                   </div>
+                </div>
 
               </div>
             </div>
