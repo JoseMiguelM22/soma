@@ -369,7 +369,7 @@ export default function Home() {
                 onClick={() => setActiveVideo('/miguel_video.mp4')} 
                 className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video border border-transparent hover:border-[#b0ff4c]/50 transition-colors"
               >
-                <img src="/miguel.svg" alt="Miguel Gómez" className="w-full h-full object-cover transition-transform duration-700 group-hover/video:scale-105" />
+                <img src="/miguelnu.png" alt="Miguel Gómez" className="w-full h-full object-cover transition-transform duration-700 group-hover/video:scale-105" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/video:opacity-100 flex items-center justify-center transition-opacity duration-300">
                   <PlayCircle size={64} className="text-[#b0ff4c] drop-shadow-2xl" strokeWidth={1.5} />
                 </div>
@@ -416,7 +416,7 @@ export default function Home() {
             </div>
 
             {/* CREADOR 3: Gregory */}
-            <div className="bg-gradient-to-b from-[#2a2a2a] to-[#222] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
+            <div className="bg-gradient-to-b from-[#2a2a2a] to-[rgb(34,34,34)] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
               <div className="w-full flex justify-center mb-4 text-center">
                 <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] border border-white/10 px-4 py-1.5 rounded-full">
                   Tutor Académico
@@ -424,10 +424,10 @@ export default function Home() {
               </div>
               
               <div 
-                onClick={() => setActiveVideo('/gregory_video.mp4')} 
+                onClick={() => setActiveVideo('/gregory.mp4')} 
                 className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video border border-transparent hover:border-[#b0ff4c]/50 transition-colors"
               >
-                <img src="/gregory.jpg" alt="Gregory Cedetto" className="w-full h-full object-cover grayscale transition-all duration-700 group-hover/video:scale-105 group-hover/video:grayscale-0" />
+                <img src="/gregory.jpeg" alt="Gregory Cedetto" className="w-full h-full object-cover grayscale transition-all duration-700 group-hover/video:scale-105 group-hover/video:grayscale-0" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/video:opacity-100 flex items-center justify-center transition-opacity duration-300">
                   <PlayCircle size={64} className="text-white drop-shadow-2xl" strokeWidth={1.5} />
                 </div>

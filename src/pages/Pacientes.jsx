@@ -70,22 +70,20 @@ export default function Pacientes() {
   }, [isDarkMode]);
 
   const fetchData = async () => {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (!session || sessionError) {
-      navigate('/login');
-      return;
-    }
-    const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
-    if (dbUser) setUserData(dbUser);
+   // ... dentro de tu función fetchData
+const { data: { session } } = await supabase.auth.getSession();
+const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
 
-    const { data: dbPacientes, error: pacError } = await supabase
-      .from('pacientes')
-      .select('*')
-      .eq('id_medico', session.user.id)
-      .order('created_at', { ascending: false });
+let query = supabase.from('pacientes').select('*');
 
-    if (dbPacientes && !pacError) setPacientes(dbPacientes);
-    setLoadingPacientes(false);
+// SOLO FILTRAMOS SI EL ROL ES MÉDICO
+if (dbUser?.rol === 'especialista') {
+   query = query.eq('id_medico', session.user.id);
+}
+
+// Si es admision, NO agregamos el .eq, por lo tanto trae TODOS
+const { data: dbPacientes } = await query.order('nombres', { ascending: true });
+setPacientes(dbPacientes || []);
   };
 
   const cargarConsultasPaciente = async (idPaciente) => {
@@ -634,35 +632,149 @@ export default function Pacientes() {
                 )}
 
                 {/* 2. HISTORIAS CLÍNICAS TAB */}
-                {activeTab === 'historias' && (
-                  <div className="animate-[fadeIn_0.2s_ease-out]">
-                    {historiaView === 'list' ? (
-                      <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl max-w-lg mx-auto p-12 text-center bg-white/50 dark:bg-[#111111]/50 backdrop-blur-sm mt-10">
-                        <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-6"><FileText size={32} /></div>
-                        <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2">Sin historias aún</h4>
-                        <p className="text-sm text-slate-500 mb-8 max-w-sm mx-auto">Comienza a registrar la evolución médica de este paciente.</p>
-                        <button onClick={() => setHistoriaView('create')} className="bg-[#0081a7] text-white px-5 py-2.5 rounded-xl text-sm font-bold mx-auto flex items-center gap-2"><Plus size={16} /> Crear la primera</button>
-                      </div>
-                    ) : (
-                      <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden p-6 shadow-sm">
-                        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
-                          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Nueva Historia Evolutiva</h3>
-                          <div className="flex gap-2">
-                            <button onClick={() => setHistoriaView('list')} className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300">Cancelar</button>
-                            <button onClick={handleGuardarHistoria} className="px-5 py-2 bg-[#0081a7] text-white rounded-xl text-xs font-bold">Guardar Consulta</button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-xs">
-                          <div><label className="font-bold text-slate-700 dark:text-slate-300">Fecha Consulta</label><input type="datetime-local" value={nuevaHistoria.fecha_consulta} onChange={(e) => setNuevaHistoria({...nuevaHistoria, fecha_consulta: e.target.value})} className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert" /></div>
-                          <div><label className="font-bold text-slate-700 dark:text-slate-300">Próxima Consulta</label><input type="datetime-local" value={nuevaHistoria.proxima_consulta} onChange={(e) => setNuevaHistoria({...nuevaHistoria, proxima_consulta: e.target.value})} className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert" /></div>
-                          <div><label className="font-bold text-slate-700 dark:text-slate-300">Consultorio</label><select value={nuevaHistoria.consultorio} onChange={(e) => setNuevaHistoria({...nuevaHistoria, consultorio: e.target.value})} className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"><option value="">Seleccione...</option>{listaConsultorios.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                        </div>
-                        <textarea value={nuevaHistoria.nota_clinica} onChange={(e) => setNuevaHistoria({...nuevaHistoria, nota_clinica: e.target.value})} className="w-full min-h-[300px] p-4 text-sm bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none text-slate-900 dark:text-white" placeholder="Escribe el examen físico y diagnóstico..." />
-                      </div>
-                    )}
-                  </div>
-                )}
-
+{activeTab === 'historias' && (
+  <div className="animate-[fadeIn_0.2s_ease-out]">
+    {historiaView === 'list' ? (
+      <>
+        {consultasPaciente.length > 0 ? (
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Historial de Consultas</h3>
+              <button
+                onClick={() => setHistoriaView('create')}
+                className="flex items-center gap-2 bg-[#0081a7] hover:bg-[#006b8a] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-colors"
+              >
+                <Plus size={16} /> Nueva consulta
+              </button>
+            </div>
+            <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
+                    <tr className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                      <th className="px-4 py-3">Fecha</th>
+                      <th className="px-4 py-3">Motivo</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Consultorio</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                    {consultasPaciente.map((consulta) => (
+                      <tr
+                        key={consulta.id}
+                        className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"
+                      >
+                        <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-200">
+                          {formatearFechaTextoCompleta(consulta.fecha_consulta)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                          {consulta.motivo || 'Evolutiva'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-block bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-xs font-bold">
+                            {consulta.estado || 'Completada'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                          {consulta.consultorio || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => alert(consulta.nota_clinica || 'Sin notas registradas.')}
+                            className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 text-xs font-bold transition-colors"
+                          >
+                            Ver nota
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl max-w-lg mx-auto p-12 text-center bg-white/50 dark:bg-[#111111]/50 backdrop-blur-sm mt-10">
+            <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <FileText size={32} />
+            </div>
+            <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2">Sin historias aún</h4>
+            <p className="text-sm text-slate-500 mb-8 max-w-sm mx-auto">
+              Comienza a registrar la evolución médica de este paciente.
+            </p>
+            <button
+              onClick={() => setHistoriaView('create')}
+              className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-5 py-2.5 rounded-xl text-sm font-bold mx-auto flex items-center gap-2 shadow-md transition-colors"
+            >
+              <Plus size={16} /> Crear la primera
+            </button>
+          </div>
+        )}
+      </>
+    ) : (
+      /* Formulario de creación (sin cambios) */
+      <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden p-6 shadow-sm">
+        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Nueva Historia Evolutiva</h3>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setHistoriaView('list')}
+              className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleGuardarHistoria}
+              className="px-5 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+            >
+              Guardar Consulta
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-xs">
+          <div>
+            <label className="font-bold text-slate-700 dark:text-slate-300">Fecha Consulta</label>
+            <input
+              type="datetime-local"
+              value={nuevaHistoria.fecha_consulta}
+              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, fecha_consulta: e.target.value })}
+              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert"
+            />
+          </div>
+          <div>
+            <label className="font-bold text-slate-700 dark:text-slate-300">Próxima Consulta</label>
+            <input
+              type="datetime-local"
+              value={nuevaHistoria.proxima_consulta}
+              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, proxima_consulta: e.target.value })}
+              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert"
+            />
+          </div>
+          <div>
+            <label className="font-bold text-slate-700 dark:text-slate-300">Consultorio</label>
+            <select
+              value={nuevaHistoria.consultorio}
+              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, consultorio: e.target.value })}
+              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="">Seleccione...</option>
+              {listaConsultorios.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <textarea
+          value={nuevaHistoria.nota_clinica}
+          onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, nota_clinica: e.target.value })}
+          className="w-full min-h-[300px] p-4 text-sm bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none text-slate-900 dark:text-white"
+          placeholder="Escribe el examen físico y diagnóstico..."
+        />
+      </div>
+    )}
+  </div>
+)}
                 {/* 3. RÉCIPES E INDICACIONES TAB */}
                 {activeTab === 'recipes' && (
                   <div className="animate-[fadeIn_0.2s_ease-out]">
