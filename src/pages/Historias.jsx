@@ -47,47 +47,66 @@ export default function Historias() {
     nota_clinica: plantillaHTML
   });
 
-  const listaConsultorios = ["Hospital Cardon" ];
+  const listaConsultorios = ["Hospital Cardon"];
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  // ================= CARGA DE DATOS =================
+  // ================= CARGA DE DATOS CORREGIDA (LÓGICA DE ROLES) =================
   const fetchData = async () => {
     setLoading(true);
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (!session || sessionError) return navigate('/login');
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (!session || sessionError) return navigate('/login');
 
-    const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
-    if (dbUser) setUserData(dbUser);
+      // 1. Obtener usuario y rol
+      const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
+      if (dbUser) setUserData(dbUser);
 
-    const { data: dbPacientes } = await supabase.from('pacientes').select('*').eq('id_medico', session.user.id).order('nombres', { ascending: true });
-    if (dbPacientes) setPacientesLista(dbPacientes);
+      // 2. Cargar pacientes para el selector (Condicional por rol)
+      let queryPacientes = supabase.from('pacientes').select('*').order('nombres', { ascending: true });
+      if (dbUser?.rol === 'especialista') {
+        queryPacientes = queryPacientes.eq('id_medico', session.user.id);
+      }
+      const { data: dbPacientes } = await queryPacientes;
+      if (dbPacientes) setPacientesLista(dbPacientes);
 
-    const { data: dbConsultas, error: consError } = await supabase
-      .from('consultas')
-      .select('*, pacientes(*)')
-      .eq('id_medico', session.user.id)
-      .order('created_at', { ascending: false });
+      // 3. Cargar Consultas / Historias (Condicional por rol)
+      let queryConsultas = supabase
+        .from('consultas')
+        .select('*, pacientes(*)')
+        .order('created_at', { ascending: false });
 
-    if (dbConsultas && !consError) {
-      const validas = dbConsultas.filter(c => c.pacientes != null);
-      setConsultas(validas);
+      if (dbUser?.rol === 'especialista') {
+        queryConsultas = queryConsultas.eq('id_medico', session.user.id);
+      }
 
-      const mapaAgrupado = new Map();
-      validas.forEach(c => {
-        const pac = Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes;
-        if (!mapaAgrupado.has(pac.id)) {
-          mapaAgrupado.set(pac.id, { paciente: pac, ultima_consulta: c, total_visitas: 1 });
-        } else {
-          mapaAgrupado.get(pac.id).total_visitas += 1;
-        }
-      });
-      setHistoriasAgrupadas(Array.from(mapaAgrupado.values()));
+      const { data: dbConsultas, error: consError } = await queryConsultas;
+
+      if (dbConsultas && !consError) {
+        // Solo guardar consultas que tengan un paciente válido asociado
+        const validas = dbConsultas.filter(c => c.pacientes != null);
+        setConsultas(validas);
+
+        // Agrupar las historias por paciente
+        const mapaAgrupado = new Map();
+        validas.forEach(c => {
+          const pac = Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes;
+          if (!mapaAgrupado.has(pac.id)) {
+            mapaAgrupado.set(pac.id, { paciente: pac, ultima_consulta: c, total_visitas: 1 });
+          } else {
+            mapaAgrupado.get(pac.id).total_visitas += 1;
+          }
+        });
+        setHistoriasAgrupadas(Array.from(mapaAgrupado.values()));
+      }
+    } catch (error) {
+      console.error("Error cargando historias:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, [navigate]);
@@ -381,7 +400,7 @@ export default function Historias() {
         <div>
           {/* Logo SOMA Dinámico */}
           <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <Link to="/dashboard" className="flex items-center overflow-hidden whitespace-nowrap">
+            <Link to={userData?.rol === 'especialista' ? "/dashboard" : "/admision"} className="flex items-center overflow-hidden whitespace-nowrap">
               {isCollapsed ? (
                 <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
               ) : (
@@ -402,7 +421,7 @@ export default function Historias() {
           <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
             {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
             <nav className="space-y-1.5">
-              <Link to="/dashboard" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+              <Link to={userData?.rol === 'especialista' ? "/dashboard" : "/admision"} className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
                 <Home size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
               </Link>
@@ -418,7 +437,6 @@ export default function Historias() {
                 <Calendar size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
               </Link>
-              
             </nav>
           </div>
 
@@ -430,7 +448,6 @@ export default function Historias() {
                 <User size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
               </Link>
-              
             </nav>
           </div>
         </div>
@@ -443,9 +460,9 @@ export default function Historias() {
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Médico</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">{userData?.rol || 'Usuario'}</p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData?.nombres || 'Miguel'} {userData?.apellidos || 'Gómez'}
+                  {userData?.nombres || 'Usuario'} {userData?.apellidos || ''}
                 </p>
               </div>
             )}
@@ -550,7 +567,7 @@ export default function Historias() {
                               <td className="px-4 py-4">
                                 <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-700 dark:text-cyan-400 font-bold text-xs shrink-0">
-                                    {agrup.paciente.nombres.charAt(0)}{agrup.paciente.apellidos.charAt(0)}
+                                    {(agrup.paciente.nombres || 'P').charAt(0)}{(agrup.paciente.apellidos || '').charAt(0)}
                                   </div>
                                   <p className="font-bold text-sm text-slate-900 dark:text-white">{agrup.paciente.nombres} {agrup.paciente.apellidos}</p>
                                 </div>
@@ -628,8 +645,8 @@ export default function Historias() {
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left whitespace-nowrap">
-                        <thead>
-                          <tr className="border-b border-slate-200 dark:border-white/10 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                        <thead className="bg-slate-50 dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
+                          <tr className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">
                             <th className="px-4 py-3">FECHA</th>
                             <th className="px-4 py-3">CONSULTORIO</th>
                             <th className="px-4 py-3">TIPO</th>
@@ -647,7 +664,7 @@ export default function Historias() {
                               </td>
                               <td className="px-4 py-4">
                                 <span className="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1 rounded-full text-[10px] font-bold">
-                                  {c.motivo}
+                                  {c.motivo || 'Evolutiva'}
                                 </span>
                               </td>
                               <td className="px-4 py-4 text-right">
@@ -721,6 +738,21 @@ export default function Historias() {
                   {!isModoFoco && (
                     <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl p-6 shadow-sm animate-[fadeIn_0.2s_ease-out]">
                       <h4 className="font-bold text-slate-900 dark:text-white mb-6">Fecha y lugar de la consulta</h4>
+                      
+                      {!pacienteSeleccionado && (
+                        <div className="mb-6 border-b border-slate-200 dark:border-white/10 pb-6">
+                           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Paciente asignado</label>
+                           <select 
+                             value={historiaData.id_paciente} 
+                             onChange={(e) => setHistoriaData({...historiaData, id_paciente: e.target.value})}
+                             className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
+                           >
+                             <option value="">Seleccione el paciente...</option>
+                             {pacientesLista.map(p => <option key={p.id} value={p.id}>{p.nombres} {p.apellidos} - C.I: {p.cedula}</option>)}
+                           </select>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                           <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha de la consulta</label>
@@ -747,7 +779,7 @@ export default function Historias() {
                             onChange={(e) => setHistoriaData({...historiaData, consultorio: e.target.value})}
                             className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
                           >
-                            <option value="">Seleccione o escriba...</option>
+                            <option value="">Seleccione...</option>
                             {listaConsultorios.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
                         </div>
@@ -838,7 +870,7 @@ export default function Historias() {
                         <BotonHerramienta icon={Type} comando="removeFormat" className="border-b-2 border-black dark:border-white" title="Limpiar Estilos" />
                       </div>
 
-                      {/* Área de Texto Enriquecido Editable (Tipografía de Alta Legibilidad) */}
+                      {/* Área de Texto Enriquecido Editable */}
                       <div 
                         id="editorClinico"
                         ref={notaRef}

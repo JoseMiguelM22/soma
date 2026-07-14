@@ -69,21 +69,45 @@ export default function Pacientes() {
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
+  // ================= CARGA DE DATOS CORREGIDA Y ROBUSTA =================
   const fetchData = async () => {
-   // ... dentro de tu función fetchData
-const { data: { session } } = await supabase.auth.getSession();
-const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
+    setLoadingPacientes(true);
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) return navigate('/login');
 
-let query = supabase.from('pacientes').select('*');
+      // 1. Obtener el usuario logueado para validar su rol
+      const { data: dbUser, error: userError } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id_auth', session.user.id)
+        .single();
+      
+      if (!userError && dbUser) {
+        setUserData(dbUser);
+      }
 
-// SOLO FILTRAMOS SI EL ROL ES MÉDICO
-if (dbUser?.rol === 'especialista') {
-   query = query.eq('id_medico', session.user.id);
-}
+      // 2. Construir la consulta de pacientes de forma condicional
+      let query = supabase.from('pacientes').select('*');
 
-// Si es admision, NO agregamos el .eq, por lo tanto trae TODOS
-const { data: dbPacientes } = await query.order('nombres', { ascending: true });
-setPacientes(dbPacientes || []);
+      // Si el rol es especialista (médico), filtramos solo sus pacientes asignados
+      // Si el rol es departamento (admisión / historias clínicas), no se filtra y ve todo global
+      if (dbUser?.rol === 'especialista') {
+        query = query.eq('id_medico', session.user.id);
+      }
+
+      const { data: dbPacientes, error: pacientesError } = await query.order('nombres', { ascending: true });
+
+      if (pacientesError) {
+        console.error("Error en la consulta de pacientes:", pacientesError);
+      } else {
+        setPacientes(dbPacientes || []);
+      }
+    } catch (error) {
+      console.error("Error crítico en fetchData:", error);
+    } finally {
+      setLoadingPacientes(false); // APAGA EL SPINNER PARA QUE NO SE QUEDE CARGANDO
+    }
   };
 
   const cargarConsultasPaciente = async (idPaciente) => {
@@ -97,7 +121,7 @@ setPacientes(dbPacientes || []);
     else setConsultasPaciente([]);
   };
 
-  useEffect(() => { fetchData(); }, [navigate]);
+  useEffect(() => { fetchData(); }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -296,8 +320,8 @@ setPacientes(dbPacientes || []);
   };
 
   const pacientesFiltrados = pacientes.filter(p => 
-    p.nombres.toLowerCase().includes(busqueda.toLowerCase()) || 
-    p.apellidos.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (p.nombres || '').toLowerCase().includes(busqueda.toLowerCase()) || 
+    (p.apellidos || '').toLowerCase().includes(busqueda.toLowerCase()) ||
     (p.cedula && p.cedula.includes(busqueda)) ||
     (p.telefono && p.telefono.includes(busqueda))
   );
@@ -327,13 +351,12 @@ setPacientes(dbPacientes || []);
         <div>
           {/* Logo SOMA Dinámico */}
           <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <Link to="/dashboard" className="flex items-center overflow-hidden whitespace-nowrap">
+            <Link to={userData?.rol === 'especialista' ? "/dashboard" : "/admision"} className="flex items-center overflow-hidden whitespace-nowrap">
               {isCollapsed ? (
                 <span className="text-emerald-500 text-3xl mb-1 font-black">*</span>
               ) : (
                 <>
                   <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
-                  {/* Modo Oscuro (Logo Blanco) */}
                   <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
                 </>
               )}
@@ -349,7 +372,7 @@ setPacientes(dbPacientes || []);
           <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
             {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
             <nav className="space-y-1.5">
-              <Link to="/dashboard" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
+              <Link to={userData?.rol === 'especialista' ? "/dashboard" : "/admision"} className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
                 <Home size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
               </Link>
@@ -365,7 +388,6 @@ setPacientes(dbPacientes || []);
                 <Calendar size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
               </Link>
-              
             </nav>
           </div>
 
@@ -377,7 +399,6 @@ setPacientes(dbPacientes || []);
                 <User size={20} className="shrink-0" />
                 {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
               </Link>
-              
             </nav>
           </div>
         </div>
@@ -390,9 +411,9 @@ setPacientes(dbPacientes || []);
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Médico</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">{userData?.rol || 'Usuario'}</p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData?.nombres || 'Miguel'} {userData?.apellidos || 'Gómez'}
+                  {userData?.nombres || 'Usuario'} {userData?.apellidos || ''}
                 </p>
               </div>
             )}
@@ -425,7 +446,9 @@ setPacientes(dbPacientes || []);
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
                 <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
-                    <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Mis pacientes</h2>
+                    <h2 className="text-3xl font-black text-white mb-2 tracking-tight">
+                      {userData?.rol === 'especialista' ? 'Mis pacientes' : 'Pacientes Globales'}
+                    </h2>
                     <p className="text-cyan-100 text-sm font-medium">Gestiona y accede rápidamente a las historias clínicas de tu consulta.</p>
                   </div>
                   <button onClick={() => setIsModalCrearOpen(true)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5">
@@ -470,7 +493,7 @@ setPacientes(dbPacientes || []);
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
                                   <div className="w-9 h-9 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-700 font-bold text-xs shrink-0">
-                                    {paciente.nombres.charAt(0)}{paciente.apellidos.charAt(0)}
+                                    {(paciente.nombres || 'P').charAt(0)}{(paciente.apellidos || '').charAt(0)}
                                   </div>
                                   <p className="font-bold text-sm text-slate-900 dark:text-white">{paciente.nombres} {paciente.apellidos}</p>
                                 </div>
@@ -541,13 +564,11 @@ setPacientes(dbPacientes || []);
                 {/* 1. DATOS TAB */}
                 {activeTab === 'datos' && (
                   <>
-                    {/* Dashboard del Paciente Header */}
                     <div className="mb-6">
                       <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard del Paciente</h3>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Resumen y datos personales de {pacienteSeleccionado.nombres} {pacienteSeleccionado.apellidos}</p>
                     </div>
 
-                    {/* Tarjetas de Resumen Dinámicas */}
                     <div className="flex flex-col md:flex-row gap-6 mb-8">
                       <div className="flex-1 bg-white dark:bg-[#111111] p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-5 transition-transform hover:-translate-y-1">
                         <div className="w-12 h-12 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
@@ -559,7 +580,7 @@ setPacientes(dbPacientes || []);
                         </div>
                       </div>
 
-                      <div className="flex-1 bg-white dark:bg-[#111111] p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm flex items-center gap-5 transition-transform hover:-translate-y-1">
+                      <div className="flex-1 bg-white dark:bg-[#111111] p-6 rounded-2xl border border-slate-200/80 dark:border-white/5 shadow-sm flex items-center gap-5 transition-transform hover:-translate-y-1">
                         <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                           <Calendar size={24} />
                         </div>
@@ -632,149 +653,149 @@ setPacientes(dbPacientes || []);
                 )}
 
                 {/* 2. HISTORIAS CLÍNICAS TAB */}
-{activeTab === 'historias' && (
-  <div className="animate-[fadeIn_0.2s_ease-out]">
-    {historiaView === 'list' ? (
-      <>
-        {consultasPaciente.length > 0 ? (
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Historial de Consultas</h3>
-              <button
-                onClick={() => setHistoriaView('create')}
-                className="flex items-center gap-2 bg-[#0081a7] hover:bg-[#006b8a] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-colors"
-              >
-                <Plus size={16} /> Nueva consulta
-              </button>
-            </div>
-            <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
-                    <tr className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                      <th className="px-4 py-3">Fecha</th>
-                      <th className="px-4 py-3">Motivo</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3">Consultorio</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                    {consultasPaciente.map((consulta) => (
-                      <tr
-                        key={consulta.id}
-                        className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"
-                      >
-                        <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-200">
-                          {formatearFechaTextoCompleta(consulta.fecha_consulta)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
-                          {consulta.motivo || 'Evolutiva'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-block bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-xs font-bold">
-                            {consulta.estado || 'Completada'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
-                          {consulta.consultorio || '-'}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => alert(consulta.nota_clinica || 'Sin notas registradas.')}
-                            className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 text-xs font-bold transition-colors"
-                          >
-                            Ver nota
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl max-w-lg mx-auto p-12 text-center bg-white/50 dark:bg-[#111111]/50 backdrop-blur-sm mt-10">
-            <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <FileText size={32} />
-            </div>
-            <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2">Sin historias aún</h4>
-            <p className="text-sm text-slate-500 mb-8 max-w-sm mx-auto">
-              Comienza a registrar la evolución médica de este paciente.
-            </p>
-            <button
-              onClick={() => setHistoriaView('create')}
-              className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-5 py-2.5 rounded-xl text-sm font-bold mx-auto flex items-center gap-2 shadow-md transition-colors"
-            >
-              <Plus size={16} /> Crear la primera
-            </button>
-          </div>
-        )}
-      </>
-    ) : (
-      /* Formulario de creación (sin cambios) */
-      <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden p-6 shadow-sm">
-        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
-          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Nueva Historia Evolutiva</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setHistoriaView('list')}
-              className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleGuardarHistoria}
-              className="px-5 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md transition-colors"
-            >
-              Guardar Consulta
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-xs">
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300">Fecha Consulta</label>
-            <input
-              type="datetime-local"
-              value={nuevaHistoria.fecha_consulta}
-              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, fecha_consulta: e.target.value })}
-              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert"
-            />
-          </div>
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300">Próxima Consulta</label>
-            <input
-              type="datetime-local"
-              value={nuevaHistoria.proxima_consulta}
-              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, proxima_consulta: e.target.value })}
-              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert"
-            />
-          </div>
-          <div>
-            <label className="font-bold text-slate-700 dark:text-slate-300">Consultorio</label>
-            <select
-              value={nuevaHistoria.consultorio}
-              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, consultorio: e.target.value })}
-              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="">Seleccione...</option>
-              {listaConsultorios.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <textarea
-          value={nuevaHistoria.nota_clinica}
-          onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, nota_clinica: e.target.value })}
-          className="w-full min-h-[300px] p-4 text-sm bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none text-slate-900 dark:text-white"
-          placeholder="Escribe el examen físico y diagnóstico..."
-        />
-      </div>
-    )}
-  </div>
-)}
+                {activeTab === 'historias' && (
+                  <div className="animate-[fadeIn_0.2s_ease-out]">
+                    {historiaView === 'list' ? (
+                      <>
+                        {consultasPaciente.length > 0 ? (
+                          <div>
+                            <div className="flex justify-between items-center mb-4">
+                              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Historial de Consultas</h3>
+                              <button
+                                onClick={() => setHistoriaView('create')}
+                                className="flex items-center gap-2 bg-[#0081a7] hover:bg-[#006b8a] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-colors"
+                              >
+                                <Plus size={16} /> Nueva consulta
+                              </button>
+                            </div>
+                            <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                  <thead className="bg-slate-50 dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
+                                    <tr className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">
+                                      <th className="px-4 py-3">Fecha</th>
+                                      <th className="px-4 py-3">Motivo</th>
+                                      <th className="px-4 py-3">Estado</th>
+                                      <th className="px-4 py-3">Consultorio</th>
+                                      <th className="px-4 py-3 text-right">Acciones</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                                    {consultasPaciente.map((consulta) => (
+                                      <tr
+                                        key={consulta.id}
+                                        className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"
+                                      >
+                                        <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-200">
+                                          {formatearFechaTextoCompleta(consulta.fecha_consulta)}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                                          {consulta.motivo || 'Evolutiva'}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span className="inline-block bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-xs font-bold">
+                                            {consulta.estado || 'Completada'}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                                          {consulta.consultorio || '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                          <button
+                                            onClick={() => alert(consulta.nota_clinica || 'Sin notas registradas.')}
+                                            className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 text-xs font-bold transition-colors"
+                                          >
+                                            Ver nota
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-3xl max-w-lg mx-auto p-12 text-center bg-white/50 dark:bg-[#111111]/50 backdrop-blur-sm mt-10">
+                            <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                              <FileText size={32} />
+                            </div>
+                            <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2">Sin historias aún</h4>
+                            <p className="text-sm text-slate-500 mb-8 max-w-sm mx-auto">
+                              Comienza a registrar la evolución médica de este paciente.
+                            </p>
+                            <button
+                              onClick={() => setHistoriaView('create')}
+                              className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-5 py-2.5 rounded-xl text-sm font-bold mx-auto flex items-center gap-2 shadow-md transition-colors"
+                            >
+                              <Plus size={16} /> Crear la primera
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden p-6 shadow-sm">
+                        <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
+                          <h3 className="font-bold text-lg text-slate-900 dark:text-white">Nueva Historia Evolutiva</h3>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setHistoriaView('list')}
+                              className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={handleGuardarHistoria}
+                              className="px-5 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+                            >
+                              Guardar Consulta
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-xs">
+                          <div>
+                            <label className="font-bold text-slate-700 dark:text-slate-300">Fecha Consulta</label>
+                            <input
+                              type="datetime-local"
+                              value={nuevaHistoria.fecha_consulta}
+                              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, fecha_consulta: e.target.value })}
+                              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-bold text-slate-700 dark:text-slate-300">Próxima Consulta</label>
+                            <input
+                              type="datetime-local"
+                              value={nuevaHistoria.proxima_consulta}
+                              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, proxima_consulta: e.target.value })}
+                              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-bold text-slate-700 dark:text-slate-300">Consultorio</label>
+                            <select
+                              value={nuevaHistoria.consultorio}
+                              onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, consultorio: e.target.value })}
+                              className="w-full p-2.5 mt-1.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
+                            >
+                              <option value="">Seleccione...</option>
+                              {listaConsultorios.map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <textarea
+                          value={nuevaHistoria.nota_clinica}
+                          onChange={(e) => setNuevaHistoria({ ...nuevaHistoria, nota_clinica: e.target.value })}
+                          className="w-full min-h-[300px] p-4 text-sm bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none text-slate-900 dark:text-white"
+                          placeholder="Escribe el examen físico y diagnóstico..."
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 3. RÉCIPES E INDICACIONES TAB */}
                 {activeTab === 'recipes' && (
                   <div className="animate-[fadeIn_0.2s_ease-out]">
@@ -790,7 +811,7 @@ setPacientes(dbPacientes || []);
                         <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-white/5 mb-6">
                           <h3 className="font-bold text-xl text-slate-900 dark:text-white">Nuevo récipe</h3>
                           <div className="flex items-center gap-3">
-                            <button onClick={() => setRecipeView('list')} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"><X size={14} /> Cerrar</button>
+                            <button onClick={() => setRecipeView('list')} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors"><X size={14} /> Cancelar</button>
                             <button onClick={() => ejecutarGenerarPDF('recipe')} className="flex items-center gap-1.5 px-5 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md transition-colors"><Download size={14}/> Descargar PDF</button>
                           </div>
                         </div>
@@ -862,7 +883,7 @@ setPacientes(dbPacientes || []);
 
       {/* ================= MODAL CREAR PACIENTE NUEVO ================= */}
       {isModalCrearOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white dark:bg-[#111111] w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Registrar Nuevo Paciente</h2>
