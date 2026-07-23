@@ -65,22 +65,22 @@ export default function Home() {
         <div className="absolute inset-0 bg-[#0F1312]/60"></div>
 
         {/* NAVBAR FLOTANTE */}
-        <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-[#1c1c1c]/60 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 flex items-center justify-between z-50 shadow-2xl">
+        <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-[#1c1c1c]/60 backdrop-blur-md border border-white/10 rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between z-50 shadow-2xl">
           
-          {/* Espaciador invisible para mantener el balance centrado del logo */}
-          <div className="w-20 hidden sm:block"></div> 
-
-          {/* LOGO REAL DE SOMA CENTRADO */}
-          <Link to="/" className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center">
+          {/* LOGO REAL DE SOMA (Izquierda en móvil, Centrado en PC) */}
+          <Link to="/" className="relative md:absolute md:left-1/2 md:-translate-x-1/2 flex items-center justify-center z-10">
             <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-5 sm:h-6 object-contain hover:scale-105 transition-transform" />
           </Link>
 
+          {/* Espaciador invisible para mantener el balance centrado del logo SOLO en PC */}
+          <div className="w-16 sm:w-20 hidden md:block"></div> 
+
           {/* BOTONES DERECHOS */}
-          <div className="flex items-center gap-2 ml-auto">
-            <Link to="/login" className="text-white/80 hover:text-white text-sm font-medium px-4 py-2 hidden sm:block transition-colors">
+          <div className="flex items-center gap-1 sm:gap-2 ml-auto z-10">
+            <Link to="/login" className="text-white/80 hover:text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 transition-colors">
               Acceso
             </Link>
-            <Link to="/register" className="bg-[#b0ff4c] hover:bg-[#9ded3a] text-black text-sm font-bold px-6 py-2.5 rounded-full transition-transform hover:scale-105 shadow-lg shadow-[#b0ff4c]/20">
+            <Link to="/register" className="bg-[#b0ff4c] hover:bg-[#9ded3a] text-black text-xs sm:text-sm font-bold px-4 sm:px-6 py-2 sm:py-2.5 rounded-full transition-transform hover:scale-105 shadow-lg shadow-[#b0ff4c]/20">
               Unirse
             </Link>
           </div>
@@ -415,7 +415,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* CREADOR 3: Gregory */}
+            {/* CREADOR 3: Gregory (¡Foto a full color corregida!) */}
             <div className="bg-gradient-to-b from-[#2a2a2a] to-[rgb(34,34,34)] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
               <div className="w-full flex justify-center mb-4 text-center">
                 <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] border border-white/10 px-4 py-1.5 rounded-full">
@@ -427,7 +427,7 @@ export default function Home() {
                 onClick={() => setActiveVideo('/gregory.mp4')} 
                 className="w-full aspect-[4/5] rounded-[2rem] overflow-hidden bg-black/40 mb-6 relative cursor-pointer group/video border border-transparent hover:border-[#b0ff4c]/50 transition-colors"
               >
-                <img src="/gregory.jpeg" alt="Gregory Cedetto" className="w-full h-full object-cover grayscale transition-all duration-700 group-hover/video:scale-105 group-hover/video:grayscale-0" />
+                <img src="/gregory.jpeg" alt="Gregory Cedetto" className="w-full h-full object-cover transition-transform duration-700 group-hover/video:scale-105" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/video:opacity-100 flex items-center justify-center transition-opacity duration-300">
                   <PlayCircle size={64} className="text-white drop-shadow-2xl" strokeWidth={1.5} />
                 </div>

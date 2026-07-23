@@ -11,7 +11,20 @@ export default function Agendas() {
   const navigate = useNavigate();
   
   // ================= ESTADOS DE UI =================
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme === 'light' ? false : true; 
+  });
+  
+  useEffect(() => { 
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState('Semana'); // 'Semana' o 'Mes'

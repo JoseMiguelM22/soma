@@ -2,74 +2,50 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Home, Users, FileText, Calendar, User, Settings, LogOut, 
-  Menu, Sun, Moon, PanelLeft, Activity, Clock, ChevronDown, 
-  UserPlus, Save, Search, X, CalendarPlus, FilePlus, ArrowLeft, CheckCircle, CalendarDays
+  Home, Users, FileText, Calendar, LogOut, 
+  Menu, Sun, Moon, PanelLeft, Clock, ArrowLeft, CheckCircle, 
+  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, CheckCircle2, Check
 } from 'lucide-react';
+
+// === IMPORTAMOS TUS COMPONENTES ===
+import Parte1 from './Parte1';
+import Parte2 from './Parte2';
+import Parte3 from './Parte3';
 
 export default function DashboardAdmision() {
   const navigate = useNavigate();
   
-  // ================= ESTADOS DE UI =================
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [saludo, setSaludo] = useState('Hola');
-  
   const [vistaActual, setVistaActual] = useState('inicio');
+  const [showFormatos, setShowFormatos] = useState(false); // Estado para el menú de formatos
 
-  const [openPacienteMenu, setOpenPacienteMenu] = useState(false);
-  const [openMedicoMenu, setOpenMedicoMenu] = useState(false);
-  
-  const [searchPaciente, setSearchPaciente] = useState('');
-  const [searchMedico, setSearchMedico] = useState('');
-  
-  const [showRegistroModal, setShowRegistroModal] = useState(false);
-  const [guardandoPaciente, setGuardandoPaciente] = useState(false);
-  const [nuevoPaciente, setNuevoPaciente] = useState({
-    nombres: '', apellidos: '', cedula: '', telefono: '', fecha_nacimiento: '', sexo: ''
-  });
-
-  // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   
   const [citasHoy, setCitasHoy] = useState([]);
   const [citasProximas, setCitasProximas] = useState([]);
-  
-  const [listaPacientes, setListaPacientes] = useState([]);
   const [listaMedicos, setListaMedicos] = useState([]);
 
-  const [pacienteActivo, setPacienteActivo] = useState(null);
-  const [medicoActivo, setMedicoActivo] = useState(null);
-
-  const [triajeData, setTriajeData] = useState({
-    id_paciente: '',
-    id_medico: '',
-    fecha_cita: new Date().toISOString().split('T')[0],
-    hora_cita: '', 
-    motivo: '', 
-    ta: '', 
-    fc: '', 
-    peso: '', 
-    talla: '', 
-    sintomasRapidos: [] 
+  // ESTADO MASIVO DEL FORMULARIO 15-108
+  const [formIVSS, setFormIVSS] = useState({
+    centro_asistencial: '', historia_n: '', servicio: '', piso: '', ala: '', sala_cuarto: '', cama: '',
+    apellidos_nombres: '', cedula: '', sexo: '', edad: '', edo_civil: '', lugar_nacimiento: '', fecha_nacimiento: '', nacionalidad: '', ocupacion: '', direccion_habitacion: '',
+    emergencia_nombre: '', emergencia_parentesco: '', emergencia_direccion: '', fecha_ingreso: new Date().toISOString().split('T')[0], hora_ingreso: '', fecha_admision_anterior: '',
+    motivo_ingreso: '', enfermedad_actual: '', diagnostico_provisional: '', diagnostico_clinico_final: '', diagnostico_anatomo: '',
+    temperatura: '', pulso: '', respiracion: '', ta_mx: '', ta_mn: '', peso: '', talla: '',
+    desc_parte2_1: '', desc_parte2_2: '', desc_parte3_1: '', desc_parte3_2: '',
+    fecha_autorizacion1: '', firma_autorizacion1: '', testigo_autorizacion1: '', parentesco_autorizacion1: '',
+    fecha_autorizacion2: '', firma_autorizacion2: '', testigo_autorizacion2: '', parentesco_autorizacion2: '',
+    fecha_examen: '', examen_practicado_por: '', diagnostico_servicio: ''
   });
 
-  const listaSintomasIVSS = [
-    { id: '1', label: 'Fiebre' },
-    { id: '2', label: 'Pérdida de peso' },
-    { id: '3', label: 'Erupciones (Piel)' },
-    { id: '4', label: 'Mareos / Síncope' },
-    { id: '5', label: 'Cansancio Ocular' },
-    { id: '6', label: 'Dolor general' },
-  ];
+  const [marcas, setMarcas] = useState({});
 
-  // ================= EFECTOS =================
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDarkMode);
-  }, [isDarkMode]);
+  useEffect(() => { document.documentElement.classList.toggle('dark', isDarkMode); }, [isDarkMode]);
 
   useEffect(() => {
     const hora = new Date().getHours();
@@ -83,54 +59,25 @@ export default function DashboardAdmision() {
     if (!session) return navigate('/login');
 
     const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
-    if (dbUser?.rol === 'especialista') {
-      navigate('/dashboard');
-      return;
-    }
+    if (dbUser?.rol === 'especialista') return navigate('/dashboard');
     setUserData(dbUser);
 
-    const hoyInicio = new Date();
-    hoyInicio.setHours(0,0,0,0);
-
-    const { data: todasLasCitas } = await supabase
-      .from('consultas')
-      .select(`*, pacientes (id, nombres, apellidos)`)
-      .gte('fecha_consulta', hoyInicio.toISOString())
-      .order('fecha_consulta', { ascending: true });
+    const hoyInicio = new Date(); hoyInicio.setHours(0,0,0,0);
+    const { data: todasLasCitas } = await supabase.from('consultas').select(`*, pacientes (id, nombres, apellidos)`).gte('fecha_consulta', hoyInicio.toISOString()).order('fecha_consulta', { ascending: true });
 
     if (todasLasCitas) {
       const hoy = new Date();
-      
-      const deHoy = todasLasCitas.filter(c => {
-        const d = new Date(c.fecha_consulta);
-        return d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear();
-      });
-
-      const futuras = todasLasCitas.filter(c => {
-        const d = new Date(c.fecha_consulta);
-        const hoyFin = new Date();
-        hoyFin.setHours(23,59,59,999);
-        return d > hoyFin;
-      });
-
-      setCitasHoy(deHoy);
-      setCitasProximas(futuras);
+      setCitasHoy(todasLasCitas.filter(c => { const d = new Date(c.fecha_consulta); return d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth() && d.getFullYear() === hoy.getFullYear(); }));
+      setCitasProximas(todasLasCitas.filter(c => { const d = new Date(c.fecha_consulta); const hoyFin = new Date(); hoyFin.setHours(23,59,59,999); return d > hoyFin; }));
     }
-
-    const { data: pacientesBD } = await supabase.from('pacientes').select('*').order('nombres', { ascending: true });
-    if (pacientesBD) setListaPacientes(pacientesBD);
 
     const { data: todosLosUsuarios } = await supabase.from('usuarios').select('*');
     if (todosLosUsuarios) {
       const soloMedicos = todosLosUsuarios.filter(user => {
         const rol = (user.rol || '').toLowerCase();
-        const esp = (user.especialidad || '').toLowerCase();
-        return (
-          rol === 'especialista' || rol === 'medico' || rol === 'médico' ||
-          (esp && esp !== 'admisión / triaje' && esp !== 'departamento de historias clínicas' && esp !== 'departamento de admisión')
-        );
+        return (rol === 'especialista' || rol === 'medico' || rol === 'médico');
       });
-      setListaMedicos(soloMedicos.filter(m => m.id_auth !== session.user.id));
+      setListaMedicos(soloMedicos);
     }
 
     setLoading(false);
@@ -138,774 +85,369 @@ export default function DashboardAdmision() {
 
   useEffect(() => { fetchData(); }, [navigate]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
+  const handleLogout = async () => { await supabase.auth.signOut(); navigate('/login'); };
+  const getInitials = () => { if (!userData) return "AS"; return `${userData.nombres?.charAt(0) || ''}${userData.apellidos?.charAt(0) || ''}`.toUpperCase(); };
+
+  // ================= CALCULADORA DE ALERTAS DE TIEMPO (VENEZUELA) =================
+  const getAlertaCita = (fechaStr) => {
+    if (!fechaStr) return { texto: "Sin hora", color: "text-slate-500", bg: "bg-slate-500/10", alert: false };
+    
+    const ahora = new Date();
+    const cita = new Date(fechaStr);
+    const diffMinutos = Math.round((cita - ahora) / (1000 * 60)); 
+
+    const horaFormateada = cita.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+
+    if (diffMinutos < -60) return { texto: `${horaFormateada} (Pasó hace >1h)`, color: 'text-slate-500', bg: 'bg-slate-500/10', alert: false };
+    if (diffMinutos < 0) return { texto: `${horaFormateada} (Retrasado ${Math.abs(diffMinutos)} min)`, color: 'text-rose-500', bg: 'bg-rose-500/10', alert: true };
+    if (diffMinutos <= 30) return { texto: `${horaFormateada} (En ${diffMinutos} min)`, color: 'text-amber-500', bg: 'bg-amber-500/10', alert: true };
+    
+    const horas = Math.floor(diffMinutos / 60);
+    const mins = diffMinutos % 60;
+    return { texto: `${horaFormateada} (En ${horas}h ${mins}m)`, color: 'text-emerald-500', bg: 'bg-emerald-500/10', alert: false };
   };
 
-  const getInitials = () => {
-    if (!userData) return "AS";
-    return `${userData.nombres?.charAt(0) || ''}${userData.apellidos?.charAt(0) || ''}`.toUpperCase();
+  // ================= ACCIONES DE ESTADO =================
+  const handleMarcarLlegada = async (consultaId) => {
+    try {
+      const { error } = await supabase.from('consultas').update({ estado: 'En Espera' }).eq('id', consultaId);
+      if (error) throw error; fetchData(); 
+    } catch (error) { alert("Error al marcar llegada: " + error.message); }
   };
 
-  const handleInputChange = (e) => {
-    setTriajeData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleMarcarAtendido = async (consultaId) => {
+    try {
+      const { error } = await supabase.from('consultas').update({ estado: 'Completada' }).eq('id', consultaId);
+      if (error) throw error; fetchData(); 
+    } catch (error) { alert("Error al marcar como atendido: " + error.message); }
   };
 
-  const handleNuevoPacienteChange = (e) => {
-    setNuevoPaciente({ ...nuevoPaciente, [e.target.name]: e.target.value });
-  };
-
-  const handleCheckboxChange = (label) => {
-    setTriajeData(prev => {
-      const currentSintomas = [...prev.sintomasRapidos];
-      if (currentSintomas.includes(label)) {
-        return { ...prev, sintomasRapidos: currentSintomas.filter(s => s !== label) };
-      } else {
-        return { ...prev, sintomasRapidos: [...currentSintomas, label] };
-      }
+  // ================= MANEJADORES DE FORMATO =================
+  const handleIVSSChange = (e) => setFormIVSS(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const toggleMarca = (id) => {
+    setMarcas(prev => {
+      const actual = prev[id];
+      return { ...prev, [id]: !actual ? 'X' : (actual === 'X' ? '√' : '') };
     });
   };
 
-  const handleRegistrarPaciente = async (e) => {
-    e.preventDefault();
-    setGuardandoPaciente(true);
+  const generarHTMLParaMedico = () => {
+    let hallazgosAnormales = '';
+    Object.keys(marcas).forEach(key => {
+      if(marcas[key] === 'X' && !['sexo_f','sexo_m','nac_v','nac_e','egreso_cur','egreso_mej','egreso_mue','egreso_aut'].includes(key)) {
+        hallazgosAnormales += `<li><b>${key}</b></li>`;
+      }
+    });
 
-    const pacienteData = { ...nuevoPaciente };
-    if (!pacienteData.fecha_nacimiento) pacienteData.fecha_nacimiento = null;
-
-    try {
-      const { data, error } = await supabase
-        .from('pacientes')
-        .insert([pacienteData])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await supabase.from('historias_clinicas').insert([{ id_paciente: data.id }]);
-
-      alert('¡Paciente registrado y Expediente creado exitosamente!');
-      
-      setListaPacientes(prev => [...prev, data].sort((a, b) => (a.nombres || '').localeCompare(b.nombres || '')));
-      setPacienteActivo(data);
-      setTriajeData(prev => ({ ...prev, id_paciente: data.id }));
-      
-      setNuevoPaciente({ nombres: '', apellidos: '', cedula: '', telefono: '', fecha_nacimiento: '', sexo: '' });
-      setShowRegistroModal(false);
-      setVistaActual('crear_historia');
-
-    } catch (error) {
-      alert("Error al registrar paciente: " + error.message);
-    } finally {
-      setGuardandoPaciente(false);
-    }
+    return `
+      <div style="font-family: Arial, sans-serif; font-size: 14px; color: #000; max-width: 800px;">
+        <h3 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px;">HISTORIA CLÍNICA (Forma 15-108)</h3>
+        <p><b>CENTRO ASISTENCIAL:</b> ${formIVSS.centro_asistencial} | <b>HISTORIA Nº:</b> ${formIVSS.historia_n}</p>
+        <p><b>SERVICIO:</b> ${formIVSS.servicio} | <b>PISO:</b> ${formIVSS.piso} | <b>ALA:</b> ${formIVSS.ala} | <b>SALA/CUARTO:</b> ${formIVSS.sala_cuarto} | <b>CAMA:</b> ${formIVSS.cama}</p>
+        <h4 style="background-color: #f0f0f0; padding: 5px; margin-top: 15px;">MOTIVO(S) DE INGRESO</h4>
+        <p>${formIVSS.motivo_ingreso || 'No indicado.'}</p>
+        <h4 style="background-color: #f0f0f0; padding: 5px;">ENFERMEDAD ACTUAL</h4>
+        <p>${formIVSS.enfermedad_actual || 'No indicado.'}</p>
+        <h4 style="background-color: #f0f0f0; padding: 5px;">SIGNOS VITALES</h4>
+        <table border="1" style="width: 100%; border-collapse: collapse; text-align: center;">
+          <tr>
+            <td style="padding: 5px;"><b>TEMP:</b> ${formIVSS.temperatura}°C</td><td style="padding: 5px;"><b>PULSO:</b> ${formIVSS.pulso}</td>
+            <td style="padding: 5px;"><b>RESP:</b> ${formIVSS.respiracion}</td><td style="padding: 5px;"><b>T.A:</b> ${formIVSS.ta_mx}/${formIVSS.ta_mn}</td>
+            <td style="padding: 5px;"><b>PESO:</b> ${formIVSS.peso}Kgs</td>
+          </tr>
+        </table>
+        <h4 style="background-color: #f0f0f0; padding: 5px;">HALLAZGOS ANORMALES</h4>
+        <ul>${hallazgosAnormales || '<li>Ningún hallazgo anormal reportado en la admisión.</li>'}</ul>
+        <br><br><br>
+        <h4 style="border-bottom: 1px solid #000;">DIAGNÓSTICO PROVISIONAL (A Llenar por Especialista)</h4><br><br>
+        <h4 style="border-bottom: 1px solid #000;">PLAN Y TRATAMIENTO (A Llenar por Especialista)</h4><br><br>
+      </div>
+    `;
   };
 
-  const handleGuardarTriaje = async (e) => {
+  const handleGuardarHistoria = async (e) => {
     e.preventDefault();
-    if (!triajeData.id_paciente || !triajeData.id_medico || !triajeData.fecha_cita || !triajeData.hora_cita) {
-      alert("Faltan datos importantes: Por favor asegúrate de seleccionar Paciente, Médico, Fecha y Hora.");
-      return;
-    }
-
+    if (!formIVSS.cedula || !formIVSS.apellidos_nombres) return alert("¡Epa! Debes escribir al menos la Cédula y los Apellidos/Nombres del paciente en la hoja para poder guardar.");
     setGuardando(true);
 
     try {
-      const datetimeString = `${triajeData.fecha_cita}T${triajeData.hora_cita}:00`;
-      const fechaConsulta = new Date(datetimeString);
+      let pacienteId = null;
+      const { data: pacientesExistentes, error: errBusqueda } = await supabase.from('pacientes').select('id').eq('cedula', formIVSS.cedula);
+      if (errBusqueda) throw errBusqueda;
 
-      const sintomasList = triajeData.sintomasRapidos.length > 0 ? `Síntomas marcados: ${triajeData.sintomasRapidos.join(', ')}.` : '';
-      const signosFormateados = `TA: ${triajeData.ta || 'N/A'} | FC: ${triajeData.fc || 'N/A'} | Peso: ${triajeData.peso || 'N/A'}kg | Talla: ${triajeData.talla || 'N/A'}m. ${sintomasList}`;
+      if (pacientesExistentes && pacientesExistentes.length > 0) {
+        pacienteId = pacientesExistentes[0].id;
+      } else {
+        let nombresDB = ''; let apellidosDB = ''; 
+        if (formIVSS.apellidos_nombres.includes(" ")) {
+          const partes = formIVSS.apellidos_nombres.trim().split(" ");
+          if (partes.length === 2) { nombresDB = partes[0]; apellidosDB = partes[1]; } 
+          else if (partes.length === 3) { nombresDB = partes[0] + " " + partes[1]; apellidosDB = partes[2]; } 
+          else { const mitad = Math.ceil(partes.length / 2); nombresDB = partes.slice(0, mitad).join(" "); apellidosDB = partes.slice(mitad).join(" "); }
+        } else { nombresDB = formIVSS.apellidos_nombres; apellidosDB = "-"; }
 
-      const { error } = await supabase.from('consultas').insert([{
-        id_paciente: triajeData.id_paciente,
-        id_medico: triajeData.id_medico,
-        estado: 'Agendada', 
-        motivo: triajeData.motivo, 
-        signos_vitales: signosFormateados,
-        fecha_consulta: fechaConsulta.toISOString(),
+        const sexoStr = marcas['sexo_m'] === 'X' ? 'Masculino' : (marcas['sexo_f'] === 'X' ? 'Femenino' : null);
+        
+        let fechaNacDB = null;
+        if (formIVSS.fecha_nacimiento) {
+          const matchFecha = formIVSS.fecha_nacimiento.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+          if (matchFecha) fechaNacDB = `${matchFecha[3]}-${matchFecha[2].padStart(2, '0')}-${matchFecha[1].padStart(2, '0')}`;
+          else fechaNacDB = formIVSS.fecha_nacimiento;
+        }
+        
+        const { data: nuevoPaciente, error: errCrear } = await supabase.from('pacientes').insert([{ nombres: nombresDB, apellidos: apellidosDB, cedula: formIVSS.cedula, sexo: sexoStr, fecha_nacimiento: fechaNacDB }]).select().single();
+        if (errCrear) throw errCrear;
+        pacienteId = nuevoPaciente.id;
+        await supabase.from('historias_clinicas').insert([{ id_paciente: pacienteId }]);
+      }
+
+      const idMedicoTemporal = listaMedicos.length > 0 ? listaMedicos[0].id_auth : userData?.id_auth;
+      const htmlParaMedico = generarHTMLParaMedico();
+      const fechaIngreso = formIVSS.fecha_ingreso || new Date().toISOString().split('T')[0];
+      const horaIngreso = formIVSS.hora_ingreso || '00:00';
+      const signosFormateados = `TA: ${formIVSS.ta_mx}/${formIVSS.ta_mn} | FC: ${formIVSS.pulso} | FR: ${formIVSS.respiracion} | Temp: ${formIVSS.temperatura}°C | Peso: ${formIVSS.peso}kg`;
+
+      const { error: errConsulta } = await supabase.from('consultas').insert([{
+        id_paciente: pacienteId, id_medico: idMedicoTemporal, estado: 'En Espera', 
+        motivo: formIVSS.motivo_ingreso || 'Ingreso Forma 15-108', signos_vitales: signosFormateados,
+        fecha_consulta: new Date(`${fechaIngreso}T${horaIngreso}:00`).toISOString(),
+        nota_clinica: htmlParaMedico, datos_formulario: { formIVSS, marcas }
       }]);
 
-      if (error) throw error;
+      if (errConsulta) throw errConsulta;
 
-      alert('¡Historia guardada y Cita Agendada con éxito!');
-      
-      setPacienteActivo(null);
-      setMedicoActivo(null);
-      setTriajeData({ id_paciente: '', id_medico: '', fecha_cita: new Date().toISOString().split('T')[0], hora_cita: '', motivo: '', ta: '', fc: '', peso: '', talla: '', sintomasRapidos: [] });
-      setVistaActual('inicio'); 
+      alert('¡Formato Forma 15-108 Guardado Correctamente en la Historia Clínica del Paciente!');
+      setFormIVSS({
+        centro_asistencial: '', historia_n: '', servicio: '', piso: '', ala: '', sala_cuarto: '', cama: '',
+        apellidos_nombres: '', cedula: '', sexo: '', edad: '', edo_civil: '', lugar_nacimiento: '', fecha_nacimiento: '', nacionalidad: '', ocupacion: '', direccion_habitacion: '',
+        emergencia_nombre: '', emergencia_parentesco: '', emergencia_direccion: '', fecha_ingreso: new Date().toISOString().split('T')[0], hora_ingreso: '', fecha_admision_anterior: '',
+        motivo_ingreso: '', enfermedad_actual: '', diagnostico_provisional: '', diagnostico_clinico_final: '', diagnostico_anatomo: '',
+        temperatura: '', pulso: '', respiracion: '', ta_mx: '', ta_mn: '', peso: '', talla: '', desc_parte2_1: '', desc_parte2_2: '', desc_parte3_1: '', desc_parte3_2: '',
+        fecha_autorizacion1: '', firma_autorizacion1: '', testigo_autorizacion1: '', parentesco_autorizacion1: '', fecha_autorizacion2: '', firma_autorizacion2: '', testigo_autorizacion2: '', parentesco_autorizacion2: '',
+        fecha_examen: '', examen_practicado_por: '', diagnostico_servicio: ''
+      });
+      setMarcas({});
+      setVistaActual('inicio');
       fetchData(); 
-      
-    } catch (error) {
-      alert("Error al guardar ficha: " + error.message);
-    } finally {
-      setGuardando(false);
-    }
+
+    } catch (error) { alert("Error al guardar formato: " + error.message); } finally { setGuardando(false); }
   };
-
-  const handleMarcarLlegada = async (consultaId) => {
-    try {
-      const { error } = await supabase
-        .from('consultas')
-        .update({ estado: 'En Espera' })
-        .eq('id', consultaId);
-      
-      if (error) throw error;
-      fetchData(); 
-    } catch (error) {
-      alert("Error al marcar llegada: " + error.message);
-    }
-  };
-
-  const formatearHoraExacta = (fechaIso) => {
-    if (!fechaIso) return '';
-    return new Date(fechaIso).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  const formatearFecha = (fechaIso) => {
-    if (!fechaIso) return '';
-    return new Date(fechaIso).toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'short' });
-  };
-
-  const getNombreMedico = (idMedicoAuth) => {
-    const med = listaMedicos.find(m => m.id_auth === idMedicoAuth || m.id === idMedicoAuth);
-    return med ? `Dr(a). ${med.apellidos || med.nombres}` : 'Médico';
-  };
-
-  const pacientesFiltrados = listaPacientes.filter(p => {
-    const cadena = `${p.nombres || ''} ${p.apellidos || ''} ${p.cedula || ''}`.toLowerCase();
-    return cadena.includes(searchPaciente.toLowerCase());
-  });
-
-  const medicosFiltrados = listaMedicos.filter(m => {
-    const cadena = `${m.nombres || ''} ${m.apellidos || ''} ${m.especialidad || ''}`.toLowerCase();
-    return cadena.includes(searchMedico.toLowerCase());
-  });
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-[#0B0D12]">
-        <div className="flex flex-col items-center">
-          <div className="w-16 h-16 border-4 border-blue-100 dark:border-slate-800 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-          <p className="text-slate-500 dark:text-slate-400 font-bold animate-pulse">Cargando departamento...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="flex h-screen bg-slate-100 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased">
+    <div className="flex h-screen bg-[#0B0D12] text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
+      {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />}
       
-      {/* CAPA OSCURA PARA EL MENÚ EN MÓVILES */}
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
-
-      {/* ================= MODAL REGISTRO DE PACIENTE ================= */}
-      {showRegistroModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="w-full max-w-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-white/5">
-              <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <UserPlus className="text-[#2563eb]" size={24} /> Registrar Nuevo Paciente
-                </h3>
-                <p className="text-sm text-slate-500 mt-1">Crea la ficha base para el historial clínico.</p>
-              </div>
-              <button onClick={() => setShowRegistroModal(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-100 dark:bg-white/5 rounded-full transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[70vh] custom-scrollbar-gruesa">
-              <form id="formNuevoPaciente" onSubmit={handleRegistrarPaciente} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Nombres</label>
-                    <input type="text" name="nombres" required value={nuevoPaciente.nombres} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. Juan Carlos" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Apellidos</label>
-                    <input type="text" name="apellidos" required value={nuevoPaciente.apellidos} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. Pérez Gómez" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Cédula</label>
-                    <input type="text" name="cedula" required value={nuevoPaciente.cedula} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. 12345678" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Teléfono</label>
-                    <input type="text" name="telefono" value={nuevoPaciente.telefono} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" placeholder="Ej. 04141234567" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Fec. Nacimiento</label>
-                    <input type="date" name="fecha_nacimiento" value={nuevoPaciente.fecha_nacimiento} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-widest">Sexo</label>
-                    <select name="sexo" value={nuevoPaciente.sexo} onChange={handleNuevoPacienteChange} className="w-full py-3 px-4 rounded-xl bg-slate-50 dark:bg-[#0B0D12] text-sm font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 focus:border-[#2563eb] outline-none transition-all">
-                      <option value="">Seleccionar...</option>
-                      <option value="Masculino">Masculino</option>
-                      <option value="Femenino">Femenino</option>
-                    </select>
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            <div className="p-6 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#0B0D12] flex justify-end gap-3">
-              <button type="button" onClick={() => setShowRegistroModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
-                Cancelar
-              </button>
-              <button type="submit" form="formNuevoPaciente" disabled={guardandoPaciente} className="px-8 py-2.5 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 disabled:opacity-50">
-                {guardandoPaciente ? 'Guardando...' : <><Save size={18} /> Guardar Ficha</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ================= SIDEBAR ================= */}
-      <aside 
-        className={`
-          fixed inset-y-0 left-0 z-50 
-          bg-white dark:bg-[#16161a] 
-          border-r border-slate-200/80 dark:border-white/[0.04] 
-          flex flex-col justify-between 
-          transform transition-all duration-300 ease-in-out 
-          md:relative md:translate-x-0
-          md:m-4 md:mr-0 md:rounded-3xl 
-          shadow-xl shadow-slate-200/50 dark:shadow-none
-          ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} 
-          ${isCollapsed ? 'md:w-24' : 'md:w-68'}
-        `}>
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-[#16161a] border-r border-white/[0.04] flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 md:m-4 md:mr-0 md:rounded-3xl shadow-none ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} ${isCollapsed ? 'md:w-24' : 'md:w-68'}`}>
         <div>
           <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <Link to="/admision" className="flex items-center overflow-hidden whitespace-nowrap">
-              {isCollapsed ? (
-                <span className="text-blue-500 text-3xl mb-1 font-black">*</span>
-              ) : (
-                <>
-                  <img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" />
-                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" />
-                </>
-              )}
+            <Link className="flex items-center overflow-hidden whitespace-nowrap" to="/admision">
+              {isCollapsed ? <span className="text-blue-500 text-3xl mb-1 font-black">*</span> : <><img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain" /></>}
             </Link>
-            {!isCollapsed && (
-              <button className="md:hidden text-slate-400 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}>
-                <X size={20} />
-              </button>
-            )}
+            {!isCollapsed && <button className="md:hidden text-slate-400 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>}
           </div>
-
           <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
-            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
             <nav className="space-y-1.5">
-              <Link to="/admision" className={`flex items-center gap-3 py-3 bg-blue-500/10 dark:bg-white/10 text-blue-600 dark:text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Home size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Inicio</span>}
-              </Link>
-              <Link to="/pacientes" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Users size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Pacientes</span>}
-              </Link>
-              <Link to="/historias" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <FileText size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Historias Clínicas</span>}
-              </Link>
-              <Link to="/agenda" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <Calendar size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Agenda</span>}
-              </Link>
-             
-            </nav>
-          </div>
-
-          <div className={`pt-2 ${isCollapsed ? 'px-3' : 'px-4'}`}>
-            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Configuración</p>}
-            <nav className="space-y-1.5">
-              <Link to="/perfil" className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
-                <User size={20} className="shrink-0" />
-                {!isCollapsed && <span className="whitespace-nowrap text-sm">Mi perfil</span>}
-              </Link>
-            
+              <Link className={`flex items-center gap-3 py-3 bg-white/10 text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/admision"><Home className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Inicio</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 text-slate-400 hover:bg-white/[0.03] hover:text-slate-200 rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/pacientes"><Users className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Pacientes</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 text-slate-400 hover:bg-white/[0.03] hover:text-slate-200 rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/historias"><FileText className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Historias Clínicas</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 text-slate-400 hover:bg-white/[0.03] hover:text-slate-200 rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/agenda"><Calendar className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Agenda</span>}</Link>
             </nav>
           </div>
         </div>
-
-        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+        <div className={`p-4 border-t border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-white/20">
-              {getInitials()}
-            </div>
+            <div className="w-9 h-9 shrink-0 rounded-full bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold">{getInitials()}</div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Dpto. Historias</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData?.nombres || 'Asistente'} {userData?.apellidos || ''}
-                </p>
+                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Dpto. Historias</p>
+                <p className="text-sm font-bold text-white truncate">{userData?.nombres || 'Asistente'} {userData?.apellidos || ''}</p>
               </div>
             )}
           </div>
-          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-400 dark:text-slate-500 hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-            <LogOut size={18} className="shrink-0" />
-            {!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}
-          </button>
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}><LogOut className="shrink-0" size={18}/>{!isCollapsed && <span className="text-sm">Cerrar Sesión</span>}</button>
         </div>
       </aside>
 
-      {/* ================= CONTENIDO PRINCIPAL ================= */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto w-full relative">
-        
-        <header className="h-20 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200/60 dark:border-white/[0.04] bg-white/40 dark:bg-transparent backdrop-blur-md sticky top-0 z-30">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-[#050505]">
+        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/5 bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
-            <button className="text-slate-500 dark:text-slate-400 hover:text-blue-600 md:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5" onClick={() => setIsSidebarOpen(true)}>
-              <Menu size={22} />
-            </button>
-            <button className="hidden md:flex p-2.5 text-slate-400 hover:text-white rounded-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] shadow-sm" onClick={() => setIsCollapsed(!isCollapsed)}>
-              <PanelLeft size={18} />
-            </button>
+            <button className="text-slate-400 hover:text-blue-600 md:hidden p-2 rounded-xl" onClick={() => setIsSidebarOpen(true)}><Menu size={22}/></button>
+            <button className="hidden md:flex p-2.5 text-slate-400 hover:text-white rounded-xl bg-white/5 border border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={18}/></button>
           </div>
-          
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-amber-500 dark:hover:text-yellow-400 rounded-xl bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] shadow-sm transition-all">
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-yellow-400 bg-white/5 border border-white/10 rounded-xl"><Moon size={18}/></button>
         </header>
 
-        <div className="p-6 sm:p-8 max-w-[1400px] mx-auto w-full space-y-10">
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           
-          {/* ================= VISTA 1: DASHBOARD DINÁMICO ================= */}
+          {/* ================= VISTA 1: DASHBOARD INICIO ================= */}
           {vistaActual === 'inicio' && (
-            <div className="space-y-10 animate-[fadeIn_0.3s_ease-out]">
-              
+            <div className="p-6 sm:p-8 space-y-8 animate-[fadeIn_0.3s_ease-out] max-w-[1400px] mx-auto">
               <div className="flex flex-row items-center justify-between gap-4">
                 <div className="flex-1">
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
-                    {saludo} <br className="hidden sm:block" />
-                    Asistente {userData?.apellidos || ''}!
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-[1.1]">
+                    {saludo} <br className="hidden sm:block" /> Asistente {userData?.apellidos || ''}!
                   </h2>
                 </div>
-                
-                <div className="shrink-0">
-                  <img 
-                    src="/ruta-mascota-doctora-der.svg" 
-                    alt="Asistente SOMA" 
-                    className="w-20 sm:w-28 md:w-32 drop-shadow-[0_10px_15px_rgba(0,0,0,0.3)] pointer-events-none transition-transform hover:scale-105" 
-                  />
-                </div>
+                <div className="shrink-0"><img src="/ruta-mascota-doctora-der.svg" alt="Asistente SOMA" className="w-20 sm:w-28 md:w-32 drop-shadow-[0_10px_15px_rgba(0,0,0,0.3)] pointer-events-none transition-transform hover:scale-105" /></div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 relative">
-                  <button onClick={() => setShowRegistroModal(true)} className="flex items-center justify-center gap-3 py-4 px-4 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
-                    <UserPlus size={20} />
-                    <span className="text-sm sm:text-base">Registrar Paciente</span>
-                  </button>
+                <h3 className="text-lg font-bold text-white tracking-tight">Acciones Rápidas</h3>
+                
+                {/* === BOTONERA DE ACCIONES RÁPIDAS (TIPO ESPECIALISTA) === */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full relative">
                   
-                  <button onClick={() => setVistaActual('crear_historia')} className="flex items-center justify-center gap-3 py-4 px-4 bg-[#10b981] hover:bg-[#059669] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
-                    <FilePlus size={20} />
-                    <span className="text-sm sm:text-base">Crear Historia / Cita</span>
+                  {/* Botón desplegable Crear Historia (Verde) */}
+                  <div className="relative w-full">
+                    <button onClick={() => setShowFormatos(!showFormatos)} className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl font-bold shadow-md hover:-translate-y-1 transition-transform">
+                      <FilePlus size={20}/> <span className="text-sm sm:text-base">Crear Historia</span> <ChevronDown size={18} className={`transition-transform ${showFormatos ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {showFormatos && (
+                      <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 animate-[fadeIn_0.2s_ease-out]">
+                         <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#111111]">
+                           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Formatos Disponibles</span>
+                         </div>
+                         <button 
+                            onClick={() => { setVistaActual('crear_historia'); setShowFormatos(false); }} 
+                            className="w-full text-left px-5 py-4 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors flex flex-col gap-1 border-l-4 border-transparent hover:border-[#10b981]"
+                          >
+                           <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-white">
+                             <Clipboard size={16} className="text-[#10b981]"/> Forma 15-108 (IVSS)
+                           </div>
+                           <p className="text-xs text-slate-500 dark:text-slate-400 pl-6">Formato oficial de 6 páginas para admisión clínica.</p>
+                         </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Accesos Directos - Historias (Azul) */}
+                  <button onClick={() => navigate('/historias')} className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-bold shadow-md hover:-translate-y-1 transition-transform">
+                    <FileText size={20} /> <span className="text-sm sm:text-base">Historias Clínicas</span>
                   </button>
-                  
-                  <Link to="/agenda" className="flex items-center justify-center gap-3 py-4 px-4 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-[1rem] font-bold transition-all shadow-md hover:-translate-y-1 relative z-10">
-                    <CalendarPlus size={20} />
-                    <span className="text-sm sm:text-base">Ver Agenda</span>
-                  </Link>
+
+                  {/* Accesos Directos - Agenda (Morado) */}
+                  <button onClick={() => navigate('/agenda')} className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-xl font-bold shadow-md hover:-translate-y-1 transition-transform">
+                    <Calendar size={20} /> <span className="text-sm sm:text-base">Agenda</span>
+                  </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
-                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
-                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
-                      <Clock size={20} className="text-[#2563eb] dark:text-[#b0ff4c]" /> Pacientes de Hoy
-                    </h3>
-                    <span className="text-xs font-bold bg-[#2563eb]/10 text-[#2563eb] dark:bg-[#b0ff4c]/20 dark:text-[#b0ff4c] px-3 py-1 rounded-full">
-                      {citasHoy.length} citas
-                    </span>
+                {/* PANEL PACIENTES DE HOY */}
+                <div className="bg-[#16161a] border border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[600px]">
+                  <div className="flex justify-between items-center mb-6 border-b border-white/[0.04] pb-4 shrink-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-white"><Clock className="text-[#b0ff4c]" size={20}/> Pacientes de Hoy</h3>
+                    <span className="text-xs font-bold bg-[#b0ff4c]/20 text-[#b0ff4c] px-3 py-1 rounded-full">{citasHoy.length} citas</span>
                   </div>
-                  
                   <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
                     {citasHoy.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                        <Clock size={56} className="text-slate-300 dark:text-white/10 mb-4" strokeWidth={1.5} />
-                        <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Día Libre</p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm leading-relaxed">
-                          No hay citas programadas para el día de hoy.
-                        </p>
+                        <Clock className="text-white/10 mb-4" size={56}/>
+                        <p className="text-white font-bold text-base mb-1">Día Libre</p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {citasHoy.map((cita) => (
-                          <div key={cita.id} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] hover:border-[#2563eb]/50 dark:hover:border-[#b0ff4c]/50 transition-colors shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h4 className="font-bold text-slate-900 dark:text-white text-lg">
-                                  {cita.pacientes?.nombres} {cita.pacientes?.apellidos}
-                                </h4>
-                                <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-1">
-                                  Asignado a: {getNombreMedico(cita.id_medico)}
-                                </p>
-                              </div>
-                              <span className="text-[10px] text-slate-500 font-bold bg-slate-200 dark:bg-white/5 px-2 py-1 rounded-md flex items-center gap-1 border border-slate-300 dark:border-white/5">
-                                <Clock size={10} /> {formatearHoraExacta(cita.fecha_consulta)}
-                              </span>
-                            </div>
-                            
-                            <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
-                              {cita.estado === 'Agendada' ? (
-                                <button 
-                                  onClick={() => handleMarcarLlegada(cita.id)}
-                                  className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-all flex justify-center items-center gap-2"
-                                >
-                                  <CheckCircle size={16} /> Anunciar Llegada
-                                </button>
-                              ) : cita.estado === 'En Espera' ? (
-                                <span className="w-full text-center border border-amber-300 text-amber-600 dark:border-amber-500/30 dark:text-amber-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-amber-50 dark:bg-amber-500/10">
-                                  En Sala de Espera
-                                </span>
-                              ) : (
-                                <span className="w-full text-center border border-emerald-300 text-emerald-600 dark:border-emerald-500/30 dark:text-emerald-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-emerald-50 dark:bg-emerald-500/10">
+                      <div className="space-y-4 pb-4">
+                        {citasHoy.map((cita) => {
+                          const alerta = getAlertaCita(cita.fecha_consulta);
+                          const esCompletada = cita.estado === 'Atendido' || cita.estado === 'Completada';
+                          
+                          return (
+                            <div key={cita.id} className={`p-5 rounded-2xl border transition-all ${alerta.alert && !esCompletada ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-slate-800'} bg-[#0B0D12]`}>
+                              <div className="flex justify-between items-start mb-3">
+                                <div>
+                                  <h4 className="font-bold text-white text-lg">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
+                                  
+                                  {/* ALERTA DE TIEMPO (RELOJ VENEZUELA) */}
+                                  <p className={`text-[11px] font-bold mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${alerta.bg} ${alerta.color}`}>
+                                    {alerta.alert && !esCompletada ? <AlertCircle size={12}/> : <Clock size={12}/>} 
+                                    {alerta.texto}
+                                  </p>
+                                </div>
+                                
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border ${esCompletada ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-slate-400 border-white/10'}`}>
                                   {cita.estado}
                                 </span>
-                              )}
+                              </div>
+                              
+                              {/* BOTONERA DINÁMICA DE FLUJO */}
+                              <div className="flex gap-2 mt-4 pt-4 border-t border-white/5">
+                                {cita.estado === 'Agendada' && (
+                                  <button onClick={() => handleMarcarLlegada(cita.id)} className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-colors">
+                                    <CheckCircle className="inline mr-2" size={16}/> Anunciar Llegada
+                                  </button>
+                                )}
+                                
+                                {cita.estado === 'En Espera' && (
+                                  <button onClick={() => handleMarcarAtendido(cita.id)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-colors">
+                                    <CheckCircle2 className="inline mr-2" size={16}/> Marcar como Atendido
+                                  </button>
+                                )}
+                                
+                                {esCompletada && (
+                                  <div className="w-full text-center border border-slate-700 text-slate-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-white/5 flex items-center justify-center gap-2">
+                                    <Check size={16} className="text-emerald-500"/> Paciente Resuelto
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-[#16161a] border border-slate-200/80 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
-                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
-                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
-                      <CalendarDays size={20} className="text-[#8b5cf6]" /> Próximas Citas
-                    </h3>
-                    <Link to="/agenda" className="text-xs font-bold text-[#8b5cf6] hover:underline">
-                      Ver Agenda Completa
-                    </Link>
+                <div className="bg-[#16161a] border border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
+                  <div className="flex justify-between items-center mb-6 border-b border-white/[0.04] pb-4 shrink-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-white"><CalendarDays className="text-[#8b5cf6]" size={20}/> Próximas Citas</h3>
                   </div>
-                  
                   <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
                     {citasProximas.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                        <CalendarDays size={56} className="text-slate-300 dark:text-white/10 mb-4" strokeWidth={1.5} />
-                        <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Agenda Despejada</p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm leading-relaxed">
-                          No hay citas agendadas a futuro por el momento.
-                        </p>
+                        <CalendarDays className="text-white/10 mb-4" size={56}/>
+                        <p className="text-white font-bold text-base mb-1">Agenda Despejada</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
                         {citasProximas.slice(0, 5).map((cita) => (
-                          <div key={cita.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] flex items-center justify-between gap-4">
-                            <div className="overflow-hidden">
-                              <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                                {cita.pacientes?.nombres} {cita.pacientes?.apellidos}
-                              </h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                                {getNombreMedico(cita.id_medico)}
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{formatearFecha(cita.fecha_consulta)}</p>
-                              <p className="text-[10px] text-slate-500 font-bold uppercase">{formatearHoraExacta(cita.fecha_consulta)}</p>
-                            </div>
+                          <div key={cita.id} className="p-4 rounded-xl border border-slate-800 bg-[#0B0D12] flex items-center justify-between gap-4">
+                            <h4 className="font-bold text-white text-sm truncate">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
                           </div>
                         ))}
-                        {citasProximas.length > 5 && (
-                          <Link to="/agenda" className="block text-center text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white py-2">
-                            Ver {citasProximas.length - 5} citas más...
-                          </Link>
-                        )}
                       </div>
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
           )}
 
-          {/* ================= VISTA 2: FORMULARIO DE HISTORIA (HOJA FÍSICA) ================= */}
+          {/* ================= VISTA 2: FORMULARIO IVSS 15-108 ================= */}
           {vistaActual === 'crear_historia' && (
-            <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+            <div className="animate-[fadeIn_0.3s_ease-out] pb-20 mt-6 px-4 relative">
               
-              <button 
-                onClick={() => setVistaActual('inicio')}
-                className="flex items-center gap-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white font-bold transition-colors bg-slate-200 dark:bg-white/5 px-4 py-2 rounded-lg w-fit"
-              >
-                <ArrowLeft size={18} /> Volver al Inicio
-              </button>
-
-              <div className="bg-[#F8F7F4] text-slate-900 border border-[#D5D0C6] rounded-md shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex flex-col mx-auto max-w-4xl relative z-10">
-                
-                <div className="p-8 pb-4 border-b-2 border-slate-400 bg-[#F8F7F4] rounded-t-md">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">SISTEMA MÉDICO SOMA</p>
-                      <p className="text-xs font-semibold text-slate-600">DEPARTAMENTO DE HISTORIAS CLÍNICAS</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Forma 01-TRJ</p>
-                    </div>
-                  </div>
-                  
-                  <div className="text-center mb-6">
-                    <h2 className="text-2xl font-serif font-bold text-slate-800 tracking-wider">HISTORIA CLÍNICA</h2>
-                    <p className="text-sm font-serif text-slate-600 tracking-widest uppercase mt-1">Apertura y Triaje</p>
-                  </div>
-                </div>
-                
-                <div className="px-8 pb-8">
-                  <form id="formTriaje" onSubmit={handleGuardarTriaje} className="space-y-8 relative">
-                    
-                    {/* FILA 1: PACIENTE Y MÉDICO */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-4">
-                      
-                      {/* DROPDOWN PACIENTE */}
-                      <div className={`relative ${openPacienteMenu ? 'z-50' : 'z-10'}`}>
-                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">NOMBRE DEL PACIENTE</span>
-                        <button 
-                          type="button"
-                          onClick={() => { setOpenPacienteMenu(!openPacienteMenu); setOpenMedicoMenu(false); }}
-                          className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
-                        >
-                          <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${pacienteActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
-                            {pacienteActivo ? `${pacienteActivo.nombres} ${pacienteActivo.apellidos}` : '(Clic para buscar...)'}
-                          </span>
-                          <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openPacienteMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
-                        </button>
-                        
-                        {openPacienteMenu && (
-                          <>
-                            <div className="fixed inset-0 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); }}></div>
-                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-10 flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
-                              <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
-                                <Search size={16} className="text-slate-400 shrink-0" />
-                                <input 
-                                  type="text" 
-                                  placeholder="Buscar nombre o cédula..." 
-                                  value={searchPaciente} 
-                                  onChange={(e) => setSearchPaciente(e.target.value)} 
-                                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                                  onClick={(e) => e.stopPropagation()} 
-                                  className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" 
-                                  autoFocus 
-                                />
-                              </div>
-                              <div className="p-2 border-b border-slate-200 bg-slate-50/50">
-                                <button type="button" onClick={(e) => { e.stopPropagation(); setOpenPacienteMenu(false); setShowRegistroModal(true); }} className="w-full flex items-center justify-center gap-2 py-2 bg-blue-100 hover:bg-blue-600 text-blue-700 hover:text-white rounded-lg font-bold text-sm transition-colors">
-                                  <UserPlus size={16} /> Registrar Nuevo Paciente
-                                </button>
-                              </div>
-                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-20">
-                                {pacientesFiltrados.length === 0 ? (
-                                  <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron pacientes.</div>
-                                ) : (
-                                  pacientesFiltrados.map(p => (
-                                    <button 
-                                      key={p.id} 
-                                      type="button" 
-                                      onClick={(e) => { 
-                                        e.preventDefault();
-                                        e.stopPropagation(); 
-                                        setTriajeData(prev => ({ ...prev, id_paciente: p.id })); 
-                                        setPacienteActivo(p); 
-                                        setOpenPacienteMenu(false); 
-                                        setSearchPaciente(''); 
-                                      }} 
-                                      className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium flex justify-between items-center group"
-                                    >
-                                      <span>{p.nombres} {p.apellidos}</span>
-                                      <span className="opacity-50 text-xs font-normal group-hover:opacity-100 transition-opacity">C.I: {p.cedula}</span>
-                                    </button>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* DROPDOWN MÉDICO */}
-                      <div className={`relative ${openMedicoMenu ? 'z-50' : 'z-10'}`}>
-                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">SERVICIO / MÉDICO ASIGNADO</span>
-                        <button 
-                          type="button"
-                          onClick={() => { setOpenMedicoMenu(!openMedicoMenu); setOpenPacienteMenu(false); }}
-                          className="w-full flex items-center justify-between py-2 bg-transparent border-b border-slate-400 text-left outline-none hover:bg-slate-200/50 transition-colors"
-                        >
-                          <span className={`font-serif text-lg font-bold tracking-wide truncate pr-4 ${medicoActivo ? 'text-blue-900 italic' : 'text-slate-400'}`}>
-                            {medicoActivo ? `Dr(a). ${medicoActivo.nombres} ${medicoActivo.apellidos}` : '(Clic para asignar...)'}
-                          </span>
-                          <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${openMedicoMenu ? 'rotate-180 text-[#2563eb]' : ''}`} />
-                        </button>
-                        
-                        {openMedicoMenu && (
-                          <>
-                            <div className="fixed inset-0 cursor-default" onClick={(e) => { e.stopPropagation(); setOpenMedicoMenu(false); }}></div>
-                            <div className="absolute top-[calc(100%+4px)] left-0 w-full bg-white border border-slate-300 rounded-xl shadow-2xl z-10 flex flex-col overflow-hidden animate-[fadeIn_0.1s_ease-out]">
-                              <div className="p-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
-                                <Search size={16} className="text-slate-400 shrink-0" />
-                                <input 
-                                  type="text" 
-                                  placeholder="Buscar médico..." 
-                                  value={searchMedico} 
-                                  onChange={(e) => setSearchMedico(e.target.value)} 
-                                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                                  onClick={(e) => e.stopPropagation()} 
-                                  className="w-full bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400" 
-                                  autoFocus 
-                                />
-                              </div>
-                              <div className="max-h-60 overflow-y-auto custom-scrollbar-gruesa relative z-20">
-                                {medicosFiltrados.length === 0 ? (
-                                  <div className="px-4 py-4 text-sm text-slate-500 text-center font-medium">No se encontraron médicos.</div>
-                                ) : (
-                                  medicosFiltrados.map(m => (
-                                    <button 
-                                      key={m.id_auth || m.id} 
-                                      type="button" 
-                                      onClick={(e) => { 
-                                        e.preventDefault();
-                                        e.stopPropagation(); 
-                                        setTriajeData(prev => ({ ...prev, id_medico: m.id_auth || m.id })); 
-                                        setMedicoActivo(m); 
-                                        setOpenMedicoMenu(false); 
-                                        setSearchMedico(''); 
-                                      }} 
-                                      className="w-full text-left px-4 py-3 text-sm text-slate-800 hover:bg-blue-50 transition-colors border-b border-slate-100 last:border-0 font-medium"
-                                    >
-                                      Dr(a). {m.nombres} {m.apellidos} <span className="opacity-50 text-xs ml-1 font-normal block sm:inline mt-1 sm:mt-0">- {m.especialidad || 'Especialista'}</span>
-                                    </button>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* FILA 2: FECHA Y HORA DE LA CITA */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 border-b-2 border-slate-400 pb-6 pt-2">
-                      <div>
-                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">FECHA DE LA CITA</span>
-                        <input 
-                          type="date" 
-                          name="fecha_cita" 
-                          value={triajeData.fecha_cita} 
-                          onChange={handleInputChange} 
-                          className="w-full py-2 bg-transparent border-b border-slate-400 text-blue-900 font-serif text-lg font-bold tracking-wide italic outline-none cursor-pointer" 
-                          required 
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block mb-1">HORA ESTIPULADA</span>
-                        <input 
-                          type="time" 
-                          name="hora_cita" 
-                          value={triajeData.hora_cita} 
-                          onChange={handleInputChange} 
-                          className="w-full py-2 bg-transparent border-b border-slate-400 text-blue-900 font-serif text-lg font-bold tracking-wide italic outline-none cursor-pointer" 
-                          required 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="mb-4 border-b border-slate-400 pb-1">
-                        <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
-                          1.- Examen Funcional / Síntomas Rápidos
-                        </h3>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3 pl-2">
-                        {listaSintomasIVSS.map((sintoma) => (
-                          <label key={sintoma.id} className="flex items-center gap-3 cursor-pointer group w-max">
-                            <div className="relative flex items-center justify-center w-5 h-5 border border-slate-500 bg-white group-hover:border-slate-800 transition-colors">
-                              <input type="checkbox" className="opacity-0 absolute" checked={triajeData.sintomasRapidos.includes(sintoma.label)} onChange={() => handleCheckboxChange(sintoma.label)} />
-                              {triajeData.sintomasRapidos.includes(sintoma.label) && <span className="text-blue-900 font-serif font-black text-sm leading-none select-none italic">X</span>}
-                            </div>
-                            <span className="text-xs font-medium text-slate-700 select-none group-hover:text-slate-900 uppercase tracking-wide">
-                              <span className="text-slate-400 mr-2">{sintoma.id}.</span> {sintoma.label}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="mb-4 border-b border-slate-400 pb-1">
-                        <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
-                          2.- Signos Vitales
-                        </h3>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-8 gap-y-5 text-xs font-bold uppercase tracking-widest text-slate-700 pl-2">
-                        <div className="flex items-end gap-2">
-                          <span>Tensión (TA):</span>
-                          <input type="text" name="ta" value={triajeData.ta} onChange={handleInputChange} className="w-24 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ / ___" />
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <span>Frecuencia (FC):</span>
-                          <input type="text" name="fc" value={triajeData.fc} onChange={handleInputChange} className="w-20 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ lpm" />
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <span>Peso:</span>
-                          <input type="number" name="peso" value={triajeData.peso} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ kg" />
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <span>Talla:</span>
-                          <input type="number" step="0.01" name="talla" value={triajeData.talla} onChange={handleInputChange} className="w-16 bg-transparent border-b border-slate-500 text-blue-900 font-serif font-bold italic outline-none text-center focus:border-[#2563eb] placeholder:text-slate-300 placeholder:not-italic" placeholder="___ m" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="mb-4 border-b border-slate-400 pb-1">
-                        <h3 className="font-serif font-bold text-slate-800 uppercase tracking-widest text-sm flex items-center gap-2">
-                          3.- Motivo de la Consulta / Notas
-                        </h3>
-                      </div>
-                      
-                      <textarea 
-                        name="motivo" 
-                        value={triajeData.motivo} 
-                        onChange={handleInputChange} 
-                        required
-                        className="w-full bg-transparent border-0 outline-none text-blue-900 font-serif italic text-sm leading-[31px] resize-none min-h-[160px]"
-                        style={{
-                          backgroundImage: 'repeating-linear-gradient(transparent, transparent 30px, #cbd5e1 30px, #cbd5e1 31px)',
-                          backgroundAttachment: 'local',
-                          lineHeight: '31px',
-                          paddingTop: '2px'
-                        }}
-                      ></textarea>
-                    </div>
-
-                  </form>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end pb-10">
-                <button 
-                  type="submit"
-                  form="formTriaje"
-                  disabled={guardando || !triajeData.id_paciente || !triajeData.id_medico || !triajeData.fecha_cita || !triajeData.hora_cita} 
-                  className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-10 py-4 rounded-xl font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50 flex justify-center items-center gap-2 transition-all transform hover:-translate-y-1 disabled:hover:translate-y-0"
-                >
-                  {guardando ? 'Procesando...' : <><Save size={20} /> Guardar Historia y Agendar Cita</>}
+              <div className="bg-[#16161a] p-4 rounded-2xl shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center gap-4 max-w-[210mm] mx-auto border border-white/10 z-40 sticky top-20">
+                <button onClick={() => setVistaActual('inicio')} className="flex items-center gap-2 text-slate-400 font-bold hover:text-white transition-colors">
+                  <ArrowLeft size={16} /> Volver a Inicio
                 </button>
+                <div className="flex items-center gap-6">
+                   <div className="text-slate-400 text-sm font-bold tracking-widest uppercase hidden md:block">Modo de Edición Libre (F-15-108)</div>
+                   <button onClick={handleGuardarHistoria} disabled={guardando} className="bg-[#10b981] hover:bg-[#059669] text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-transform hover:-translate-y-0.5 disabled:opacity-50 flex items-center gap-2 w-full md:w-auto justify-center">
+                     {guardando ? 'Guardando...' : <><Clipboard size={18}/> Guardar en Historias Clínicas</>}
+                   </button>
+                </div>
               </div>
 
+              {/* ================= CONTENEDOR 6 PÁGINAS A4 ================= */}
+              <div className="w-[210mm] mx-auto space-y-12 pb-20">
+                <Parte1 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+                <Parte2 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+                <Parte3 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+              </div>
             </div>
           )}
 
@@ -916,16 +458,10 @@ export default function DashboardAdmision() {
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
-        
-        .custom-scrollbar-gruesa::-webkit-scrollbar { width: 12px; }
+        .custom-scrollbar-gruesa::-webkit-scrollbar { width: 10px; }
         .custom-scrollbar-gruesa::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 0 0 10px 10px; }
-        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; border: 3px solid #f1f5f9; }
-        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-5px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        .custom-scrollbar-gruesa::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
