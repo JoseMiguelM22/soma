@@ -15,12 +15,17 @@ import Parte3 from './Parte3';
 export default function DashboardAdmision() {
   const navigate = useNavigate();
   
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  // ================= ESTADOS DE UI CON MEMORIA (LOCALSTORAGE) =================
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return savedTheme === 'light' ? false : true; 
+  });
+  
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [saludo, setSaludo] = useState('Hola');
   const [vistaActual, setVistaActual] = useState('inicio');
-  const [showFormatos, setShowFormatos] = useState(false); // Estado para el menú de formatos
+  const [showFormatos, setShowFormatos] = useState(false);
 
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +50,16 @@ export default function DashboardAdmision() {
 
   const [marcas, setMarcas] = useState({});
 
-  useEffect(() => { document.documentElement.classList.toggle('dark', isDarkMode); }, [isDarkMode]);
+  // Aplicar Modo Oscuro y guardar en memoria
+  useEffect(() => { 
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const hora = new Date().getHours();
@@ -234,49 +248,53 @@ export default function DashboardAdmision() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0B0D12] text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
+    <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />}
       
       {/* ================= SIDEBAR ================= */}
-      <aside className={`fixed inset-y-0 left-0 z-50 bg-[#16161a] border-r border-white/[0.04] flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 md:m-4 md:mr-0 md:rounded-3xl shadow-none ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} ${isCollapsed ? 'md:w-24' : 'md:w-68'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#16161a] border-r border-slate-200/80 dark:border-white/[0.04] flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 md:m-4 md:mr-0 md:rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} ${isCollapsed ? 'md:w-24' : 'md:w-68'}`}>
         <div>
           <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
             <Link className="flex items-center overflow-hidden whitespace-nowrap" to="/admision">
-              {isCollapsed ? <span className="text-blue-500 text-3xl mb-1 font-black">*</span> : <><img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain" /></>}
+              {isCollapsed ? <span className="text-emerald-500 text-3xl mb-1 font-black">*</span> : <><img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden" /><img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block" /></>}
             </Link>
             {!isCollapsed && <button className="md:hidden text-slate-400 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>}
           </div>
           <div className={`py-4 ${isCollapsed ? 'px-3' : 'px-4'}`}>
-            {!isCollapsed && <p className="text-[10px] font-bold text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
+            {!isCollapsed && <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-3 px-3 tracking-widest uppercase">Herramientas</p>}
             <nav className="space-y-1.5">
-              <Link className={`flex items-center gap-3 py-3 bg-white/10 text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/admision"><Home className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Inicio</span>}</Link>
-              <Link className={`flex items-center gap-3 py-3 text-slate-400 hover:bg-white/[0.03] hover:text-slate-200 rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/pacientes"><Users className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Pacientes</span>}</Link>
-              <Link className={`flex items-center gap-3 py-3 text-slate-400 hover:bg-white/[0.03] hover:text-slate-200 rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/historias"><FileText className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Historias Clínicas</span>}</Link>
-              <Link className={`flex items-center gap-3 py-3 text-slate-400 hover:bg-white/[0.03] hover:text-slate-200 rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/agenda"><Calendar className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Agenda</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 bg-emerald-500/10 dark:bg-white/10 text-emerald-600 dark:text-white rounded-xl font-bold transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/admision"><Home className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Inicio</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/pacientes"><Users className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Pacientes</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/historias"><FileText className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Historias Clínicas</span>}</Link>
+              <Link className={`flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-xl font-medium transition-all ${isCollapsed ? 'justify-center px-0' : 'px-4'}`} to="/agenda"><Calendar className="shrink-0" size={20}/>{!isCollapsed && <span className="text-sm">Agenda</span>}</Link>
             </nav>
           </div>
         </div>
-        <div className={`p-4 border-t border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-9 h-9 shrink-0 rounded-full bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold">{getInitials()}</div>
+            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-slate-300 dark:border-white/20">{getInitials()}</div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Dpto. Historias</p>
-                <p className="text-sm font-bold text-white truncate">{userData?.nombres || 'Asistente'} {userData?.apellidos || ''}</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Dpto. Historias</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{userData?.nombres || 'Asistente'} {userData?.apellidos || ''}</p>
               </div>
             )}
           </div>
-          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}><LogOut className="shrink-0" size={18}/>{!isCollapsed && <span className="text-sm">Cerrar Sesión</span>}</button>
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}><LogOut className="shrink-0" size={18}/>{!isCollapsed && <span className="text-sm">Cerrar Sesión</span>}</button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-[#050505]">
-        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/5 bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
+        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-[#111111]/80 backdrop-blur-sm sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
-            <button className="text-slate-400 hover:text-blue-600 md:hidden p-2 rounded-xl" onClick={() => setIsSidebarOpen(true)}><Menu size={22}/></button>
-            <button className="hidden md:flex p-2.5 text-slate-400 hover:text-white rounded-xl bg-white/5 border border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={18}/></button>
+            <button className="text-slate-500 dark:text-slate-400 hover:text-cyan-600 md:hidden p-2 rounded-xl" onClick={() => setIsSidebarOpen(true)}><Menu size={24}/></button>
+            <button className="hidden md:flex p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={18}/></button>
           </div>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-yellow-400 bg-white/5 border border-white/10 rounded-xl"><Moon size={18}/></button>
+          
+          {/* BOTÓN MODO OSCURO ARREGLADO */}
+          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-cyan-600 dark:hover:text-yellow-400 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl transition-colors">
+            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
         </header>
 
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
@@ -286,7 +304,7 @@ export default function DashboardAdmision() {
             <div className="p-6 sm:p-8 space-y-8 animate-[fadeIn_0.3s_ease-out] max-w-[1400px] mx-auto">
               <div className="flex flex-row items-center justify-between gap-4">
                 <div className="flex-1">
-                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-[1.1]">
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
                     {saludo} <br className="hidden sm:block" /> Asistente {userData?.apellidos || ''}!
                   </h2>
                 </div>
@@ -294,9 +312,9 @@ export default function DashboardAdmision() {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-white tracking-tight">Acciones Rápidas</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
                 
-                {/* === BOTONERA DE ACCIONES RÁPIDAS (TIPO ESPECIALISTA) === */}
+                {/* === BOTONERA DE ACCIONES RÁPIDAS === */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full relative">
                   
                   {/* Botón desplegable Crear Historia (Verde) */}
@@ -338,16 +356,17 @@ export default function DashboardAdmision() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 {/* PANEL PACIENTES DE HOY */}
-                <div className="bg-[#16161a] border border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[600px]">
-                  <div className="flex justify-between items-center mb-6 border-b border-white/[0.04] pb-4 shrink-0">
-                    <h3 className="flex items-center gap-2 text-base font-bold text-white"><Clock className="text-[#b0ff4c]" size={20}/> Pacientes de Hoy</h3>
-                    <span className="text-xs font-bold bg-[#b0ff4c]/20 text-[#b0ff4c] px-3 py-1 rounded-full">{citasHoy.length} citas</span>
+                <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[600px]">
+                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white"><Clock className="text-[#10b981]" size={20}/> Pacientes de Hoy</h3>
+                    <span className="text-xs font-bold bg-[#10b981]/20 text-[#10b981] px-3 py-1 rounded-full">{citasHoy.length} citas</span>
                   </div>
                   <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
                     {citasHoy.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                        <Clock className="text-white/10 mb-4" size={56}/>
-                        <p className="text-white font-bold text-base mb-1">Día Libre</p>
+                        <Clock className="text-slate-300 dark:text-white/10 mb-4" size={56}/>
+                        <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Día Libre</p>
+                        <p className="text-slate-500 text-sm">No tienes citas pautadas para hoy.</p>
                       </div>
                     ) : (
                       <div className="space-y-4 pb-4">
@@ -356,10 +375,10 @@ export default function DashboardAdmision() {
                           const esCompletada = cita.estado === 'Atendido' || cita.estado === 'Completada';
                           
                           return (
-                            <div key={cita.id} className={`p-5 rounded-2xl border transition-all ${alerta.alert && !esCompletada ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-slate-800'} bg-[#0B0D12]`}>
+                            <div key={cita.id} className={`p-5 rounded-2xl border transition-all ${alerta.alert && !esCompletada ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-slate-200 dark:border-slate-800'} bg-slate-50 dark:bg-[#0B0D12]`}>
                               <div className="flex justify-between items-start mb-3">
                                 <div>
-                                  <h4 className="font-bold text-white text-lg">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
+                                  <h4 className="font-bold text-slate-900 dark:text-white text-lg">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
                                   
                                   {/* ALERTA DE TIEMPO (RELOJ VENEZUELA) */}
                                   <p className={`text-[11px] font-bold mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${alerta.bg} ${alerta.color}`}>
@@ -368,13 +387,13 @@ export default function DashboardAdmision() {
                                   </p>
                                 </div>
                                 
-                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border ${esCompletada ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-slate-400 border-white/10'}`}>
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded border ${esCompletada ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-slate-200 dark:bg-white/5 text-slate-500 dark:text-slate-400 border-slate-300 dark:border-white/10'}`}>
                                   {cita.estado}
                                 </span>
                               </div>
                               
                               {/* BOTONERA DINÁMICA DE FLUJO */}
-                              <div className="flex gap-2 mt-4 pt-4 border-t border-white/5">
+                              <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
                                 {cita.estado === 'Agendada' && (
                                   <button onClick={() => handleMarcarLlegada(cita.id)} className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-colors">
                                     <CheckCircle className="inline mr-2" size={16}/> Anunciar Llegada
@@ -388,8 +407,8 @@ export default function DashboardAdmision() {
                                 )}
                                 
                                 {esCompletada && (
-                                  <div className="w-full text-center border border-slate-700 text-slate-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-white/5 flex items-center justify-center gap-2">
-                                    <Check size={16} className="text-emerald-500"/> Paciente Resuelto
+                                  <div className="w-full text-center border border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 px-6 py-2.5 rounded-xl text-sm font-bold bg-slate-100 dark:bg-white/5 flex items-center justify-center gap-2">
+                                    <Check size={16} className="text-emerald-600 dark:text-emerald-500"/> Paciente Resuelto
                                   </div>
                                 )}
                               </div>
@@ -401,21 +420,21 @@ export default function DashboardAdmision() {
                   </div>
                 </div>
 
-                <div className="bg-[#16161a] border border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
-                  <div className="flex justify-between items-center mb-6 border-b border-white/[0.04] pb-4 shrink-0">
-                    <h3 className="flex items-center gap-2 text-base font-bold text-white"><CalendarDays className="text-[#8b5cf6]" size={20}/> Próximas Citas</h3>
+                <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[500px]">
+                  <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white"><CalendarDays className="text-[#8b5cf6]" size={20}/> Próximas Citas</h3>
                   </div>
                   <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-2">
                     {citasProximas.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                        <CalendarDays className="text-white/10 mb-4" size={56}/>
-                        <p className="text-white font-bold text-base mb-1">Agenda Despejada</p>
+                        <CalendarDays className="text-slate-300 dark:text-white/10 mb-4" size={56}/>
+                        <p className="text-slate-900 dark:text-white font-bold text-base mb-1">Agenda Despejada</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
                         {citasProximas.slice(0, 5).map((cita) => (
-                          <div key={cita.id} className="p-4 rounded-xl border border-slate-800 bg-[#0B0D12] flex items-center justify-between gap-4">
-                            <h4 className="font-bold text-white text-sm truncate">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
+                          <div key={cita.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0B0D12] flex items-center justify-between gap-4">
+                            <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
                           </div>
                         ))}
                       </div>
@@ -430,12 +449,12 @@ export default function DashboardAdmision() {
           {vistaActual === 'crear_historia' && (
             <div className="animate-[fadeIn_0.3s_ease-out] pb-20 mt-6 px-4 relative">
               
-              <div className="bg-[#16161a] p-4 rounded-2xl shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center gap-4 max-w-[210mm] mx-auto border border-white/10 z-40 sticky top-20">
-                <button onClick={() => setVistaActual('inicio')} className="flex items-center gap-2 text-slate-400 font-bold hover:text-white transition-colors">
+              <div className="bg-white dark:bg-[#16161a] p-4 rounded-2xl shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center gap-4 max-w-[210mm] mx-auto border border-slate-200 dark:border-white/10 z-40 sticky top-20">
+                <button onClick={() => setVistaActual('inicio')} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 dark:hover:text-white transition-colors">
                   <ArrowLeft size={16} /> Volver a Inicio
                 </button>
                 <div className="flex items-center gap-6">
-                   <div className="text-slate-400 text-sm font-bold tracking-widest uppercase hidden md:block">Modo de Edición Libre (F-15-108)</div>
+                   <div className="text-slate-500 dark:text-slate-400 text-sm font-bold tracking-widest uppercase hidden md:block">Modo de Edición Libre (F-15-108)</div>
                    <button onClick={handleGuardarHistoria} disabled={guardando} className="bg-[#10b981] hover:bg-[#059669] text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-transform hover:-translate-y-0.5 disabled:opacity-50 flex items-center gap-2 w-full md:w-auto justify-center">
                      {guardando ? 'Guardando...' : <><Clipboard size={18}/> Guardar en Historias Clínicas</>}
                    </button>
