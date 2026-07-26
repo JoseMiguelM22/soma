@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, LogOut, 
   Menu, Sun, Moon, Plus, Search, X, PanelLeft, ClipboardList, 
-  Check, Maximize, Filter, ArrowLeft, Edit3, Eye, Send, Download, FlaskConical
+  Check, Maximize, Filter, ArrowLeft, Edit3, Eye, Send, Download, FlaskConical, ShieldCheck
 } from 'lucide-react';
 import { jsPDF } from "jspdf";
 
@@ -29,6 +29,7 @@ export default function Historias() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+  
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isModoFoco, setIsModoFoco] = useState(false);
@@ -72,6 +73,10 @@ export default function Historias() {
 
   const [formIVSS, setFormIVSS] = useState(initialFormIVSS);
   const [marcas, setMarcas] = useState({});
+
+  // 🔥 NUEVOS ESTADOS PARA GUARDAR LA "FOTO" INICIAL DE LOS DATOS
+  const [initialFormSnapshot, setInitialFormSnapshot] = useState(null);
+  const [initialMarcasSnapshot, setInitialMarcasSnapshot] = useState(null);
 
   useEffect(() => { document.documentElement.classList.toggle('dark', isDarkMode); }, [isDarkMode]);
 
@@ -123,8 +128,24 @@ export default function Historias() {
     return `${String(fecha.getDate()).padStart(2, '0')} de ${meses[fecha.getMonth()]} de ${fecha.getFullYear()} a las ${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
   };
 
-  const handleIVSSChange = (e) => setFormIVSS(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  const toggleMarca = (id) => setMarcas(prev => ({ ...prev, [id]: !prev[id] ? 'X' : (prev[id] === 'X' ? '√' : '') }));
+  // 🔥 LÓGICA DE BLOQUEO SELECTIVO PARA INPUTS DE TEXTO
+  const handleIVSSChange = (e) => {
+    const { name, value } = e.target;
+    // Si es especialista y en el snapshot inicial este campo YA TENÍA algo escrito, bloqueamos el cambio.
+    if (esEspecialista && initialFormSnapshot && initialFormSnapshot[name] && initialFormSnapshot[name] !== '') {
+      return; 
+    }
+    setFormIVSS(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 🔥 LÓGICA DE BLOQUEO SELECTIVO PARA CHECKBOXES/MARCAS
+  const toggleMarca = (id) => {
+    // Si es especialista y la marca YA ESTABA seleccionada en el snapshot inicial, bloqueamos el cambio.
+    if (esEspecialista && initialMarcasSnapshot && initialMarcasSnapshot[id]) {
+      return; 
+    }
+    setMarcas(prev => ({ ...prev, [id]: !prev[id] ? 'X' : (prev[id] === 'X' ? '√' : '') }));
+  };
 
   const verHistorialPaciente = (paciente) => { setPacienteSeleccionado(paciente); setIsModalConsultaOpen(false); };
 
@@ -133,11 +154,30 @@ export default function Historias() {
       setHistoriaData({ id: consulta.id, id_paciente: consulta.id_paciente, fecha_consulta: consulta.fecha_consulta ? consulta.fecha_consulta.slice(0, 16) : consulta.created_at.slice(0, 16), proxima_consulta: consulta.proxima_consulta || '', consultorio: consulta.consultorio || '' });
       if (consulta.datos_formulario) {
         const parsed = typeof consulta.datos_formulario === 'string' ? JSON.parse(consulta.datos_formulario) : consulta.datos_formulario;
-        setFormIVSS(parsed.formIVSS || initialFormIVSS); setMarcas(parsed.marcas || {});
-      } else { setFormIVSS(initialFormIVSS); setMarcas({}); }
+        
+        // Cargar datos actuales
+        const loadedForm = parsed.formIVSS || initialFormIVSS;
+        const loadedMarcas = parsed.marcas || {};
+        
+        setFormIVSS(loadedForm); 
+        setMarcas(loadedMarcas);
+        
+        // 🔥 TOMAR SNAPSHOT PARA BLOQUEO SELECTIVO
+        setInitialFormSnapshot(loadedForm);
+        setInitialMarcasSnapshot(loadedMarcas);
+        
+      } else { 
+        setFormIVSS(initialFormIVSS); 
+        setMarcas({}); 
+        setInitialFormSnapshot(initialFormIVSS);
+        setInitialMarcasSnapshot({});
+      }
     } else {
       setHistoriaData({ id: null, id_paciente: idPacienteForzado || (pacienteSeleccionado ? pacienteSeleccionado.id : ''), fecha_consulta: new Date().toISOString().slice(0, 16), proxima_consulta: '', consultorio: '' });
-      setFormIVSS(initialFormIVSS); setMarcas({});
+      setFormIVSS(initialFormIVSS); 
+      setMarcas({});
+      setInitialFormSnapshot(initialFormIVSS);
+      setInitialMarcasSnapshot({});
     }
     setIsModalConsultaOpen(true);
   };
@@ -164,7 +204,8 @@ export default function Historias() {
       else { const res = await supabase.from('consultas').insert([payload]); error = res.error; }
 
       if (error) throw error;
-      await fetchData(); setIsModalConsultaOpen(false); alert("¡Formato guardado exitosamente!");
+      await fetchData(); setIsModalConsultaOpen(false); 
+      alert(esEspecialista ? "¡Cambios del especialista guardados y consulta completada!" : "¡Formato guardado exitosamente!");
     } catch (error) { alert("Error al guardar: " + error.message); } finally { setGuardando(false); }
   };
 
@@ -179,7 +220,7 @@ export default function Historias() {
 
   const handleImprimirPDF = () => window.print();
 
-  // ================= LÓGICA DE PDF (RÉCIPE / CONSTANCIA) CON LOGO AJUSTADO =================
+  // ================= LÓGICA DE PDF (RÉCIPE / CONSTANCIA) =================
   const generarPDF = (tipo) => {
     if (tipo === 'recipe' && !textoRecipe.trim() && !textoIndicaciones.trim()) return alert("Debes escribir algo en el récipe.");
     if (tipo === 'constancia' && !textoInforme.trim()) return alert("Debes escribir el contenido de la constancia.");
@@ -189,7 +230,6 @@ export default function Historias() {
     img.src = '/soma_logo.png'; 
 
     img.onload = () => {
-      // Coordenadas: X=20 (Izquierda), Y=15 (Arriba), Width=35, Height=10 (Tamaño de membrete profesional)
       doc.addImage(img, 'PNG', 20, 15, 35, 10);
       dibujarContenidoPDF(doc, tipo);
     };
@@ -202,19 +242,15 @@ export default function Historias() {
   };
 
   const dibujarContenidoPDF = (doc, tipo) => {
-    // Título Centrado
     doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(30, 30, 30);
     doc.text(tipo === 'recipe' ? 'RÉCIPE E INDICACIONES' : 'CONSTANCIA MÉDICA', 105, 30, { align: "center" });
     
-    // Línea separadora
     doc.setLineWidth(0.5); doc.setDrawColor(200, 200, 200); doc.line(20, 38, 190, 38);
     
-    // Datos del Médico
     doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
     doc.text(`Médico: Dr(a). ${userData?.nombres || ''} ${userData?.apellidos || ''}`, 20, 48);
     doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 150, 48);
     
-    // Datos del Paciente
     doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30); doc.text("Datos del Paciente", 20, 60);
     doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
     doc.text(`Nombre: ${pacienteSeleccionado?.nombres || ''} ${pacienteSeleccionado?.apellidos || ''}`, 20, 68);
@@ -223,7 +259,6 @@ export default function Historias() {
 
     let currentY = 85;
     
-    // Contenido dinámico
     if (tipo === 'recipe') {
       const colWidth = 80; const startXLeft = 20; const startXRight = 110; 
       doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30);
@@ -254,21 +289,28 @@ export default function Historias() {
     <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity no-print" onClick={() => setIsSidebarOpen(false)} />}
 
-      {/* ================= MODAL REMITIR ESPECIALISTA (SOLO ASISTENTE) ================= */}
+      {/* MODAL REMITIR ESPECIALISTA */}
       {isRemitirModalOpen && !esEspecialista && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
           <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-[fadeIn_0.2s_ease-out]">
             <div className="p-6 border-b border-slate-200 dark:border-white/5"><h3 className="text-lg font-bold">Remitir Historia a Especialista</h3><p className="text-sm text-slate-500 mt-1">Selecciona el médico evaluador.</p></div>
             <div className="p-6">
               <label className="block text-xs font-bold mb-2">Especialista disponible</label>
-              <select value={especialistaSelect} onChange={(e) => setEspecialistaSelect(e.target.value)} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 rounded-xl outline-none"><option value="">Seleccione un médico...</option>{listaEspecialistas.map(med => (<option key={med.id_auth} value={med.id_auth}>Dr(a). {med.nombres} {med.apellidos}</option>))}</select>
+              <select value={especialistaSelect} onChange={(e) => setEspecialistaSelect(e.target.value)} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 rounded-xl outline-none">
+                <option value="">Seleccione un médico...</option>
+                {listaEspecialistas.map(med => (
+                  <option key={med.id_auth} value={med.id_auth}>
+                    Dr(a). {med.nombres} {med.apellidos} - {med.especialidad || 'Sin especialidad'}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="p-4 bg-slate-50 dark:bg-[#111111] border-t border-slate-200 dark:border-white/5 flex justify-end gap-3"><button onClick={() => setIsRemitirModalOpen(false)} className="px-4 py-2 font-bold">Cancelar</button><button onClick={handleConfirmarRemision} disabled={!especialistaSelect || guardando} className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-bold">{guardando ? 'Remitiendo...' : 'Confirmar Remisión'}</button></div>
           </div>
         </div>
       )}
 
-      {/* ================= MODAL REDACTAR RÉCIPE (SOLO ESPECIALISTA) ================= */}
+      {/* MODAL REDACTAR RÉCIPE */}
       {isRecipeModalOpen && esEspecialista && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
           <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
@@ -282,7 +324,7 @@ export default function Historias() {
         </div>
       )}
 
-      {/* ================= MODAL REDACTAR CONSTANCIA (SOLO ESPECIALISTA) ================= */}
+      {/* MODAL REDACTAR CONSTANCIA */}
       {isConstanciaModalOpen && esEspecialista && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
           <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
@@ -343,7 +385,6 @@ export default function Historias() {
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
                 <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div><h2 className="text-3xl font-black text-white mb-2 tracking-tight">Historias clínicas</h2><p className="text-cyan-100 text-sm font-medium">Filtra por rango, busca por paciente y abre cada historia para verla.</p></div>
-                  
                 </div>
                 <div className="p-8">
                   <div className="mb-6"><div className="flex justify-between items-end mb-4"><div><h3 className="text-lg font-bold">Pacientes con Historial</h3></div></div><div className="flex flex-col md:flex-row gap-4"><div className="relative flex-1"><Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Buscar por nombre o cédula..." className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}/></div></div></div>
@@ -377,7 +418,6 @@ export default function Historias() {
                   
                   {/* ====== BOTONERA SUPERIOR SEGÚN ROL ====== */}
                   <div className="flex flex-wrap items-center gap-3">
-                    
                     {esEspecialista && (
                       <>
                         <button onClick={() => setIsRecipeModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><FlaskConical size={18} /> Redactar Récipe</button>
@@ -396,7 +436,7 @@ export default function Historias() {
                           <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors group">
                             <td className="px-4 py-4 text-sm font-bold">{formatearFechaTexto(c.fecha_consulta || c.created_at)}</td>
                             <td className="px-4 py-4"><span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-full text-[10px] font-bold">{c.estado || 'Completada'}</span></td>
-                            <td className="px-4 py-4 text-right"><button onClick={() => abrirEditorHistoria(c)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ml-auto"><Edit3 size={14} /> Ver / Editar Forma</button></td>
+                            <td className="px-4 py-4 text-right"><button onClick={() => abrirEditorHistoria(c)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ml-auto"><Edit3 size={14} /> Abrir Forma 15-108</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -426,9 +466,21 @@ export default function Historias() {
                     )}
                     <button onClick={() => setIsModoFoco(!isModoFoco)} className="flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold"><Maximize size={14} /> {isModoFoco ? 'Salir Foco' : 'Foco'}</button>
                     <button onClick={() => { setIsModalConsultaOpen(false); setIsModoFoco(false); }} className="flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold">Cancelar</button>
-                    <button onClick={handleGuardarHistoria} disabled={guardando || !historiaData.id_paciente} className="flex items-center gap-1.5 px-5 py-2 bg-[#0081a7] text-white rounded-xl text-xs font-bold">{guardando ? 'Guardando...' : <><Check size={14} /> Guardar Cambios</>}</button>
+                    
+                    {esEspecialista ? (
+                      <button onClick={handleGuardarHistoria} disabled={guardando || !historiaData.id_paciente} className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white rounded-xl text-xs font-bold">{guardando ? 'Procesando...' : <><Check size={14} /> Completar Consulta</>}</button>
+                    ) : (
+                      <button onClick={handleGuardarHistoria} disabled={guardando || !historiaData.id_paciente} className="flex items-center gap-1.5 px-5 py-2 bg-[#0081a7] text-white rounded-xl text-xs font-bold">{guardando ? 'Guardando...' : <><Check size={14} /> Guardar Cambios</>}</button>
+                    )}
                   </div>
                 </div>
+
+                {/* 🔥 BANNER INFORMATIVO PARA EL MÉDICO 🔥 */}
+                {esEspecialista && (
+                  <div className="no-print bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-6 py-3 text-[11px] md:text-xs font-bold flex items-center justify-center gap-2 border-b border-amber-200 dark:border-amber-900/50">
+                    <ShieldCheck size={16} className="shrink-0" /> Modo Seguro: Puedes llenar los campos vacíos, pero la información previamente registrada por admisión está bloqueada.
+                  </div>
+                )}
 
                 <div className="printable-form p-6 md:p-10 bg-slate-200/50 dark:bg-[#0a0a0a]/50 overflow-x-auto custom-scrollbar">
                   <div className="w-[210mm] mx-auto space-y-12 pb-10 print-pages">
