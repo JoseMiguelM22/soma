@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar as CalendarIcon, User, Settings, LogOut, 
   Menu, Sun, Moon, Plus, X, PanelLeft, Clock, 
-  ChevronLeft, ChevronRight, Link as LinkIcon, Check, Activity
+  ChevronLeft, ChevronRight, Link as LinkIcon, Check, Activity, MessageCircle
 } from 'lucide-react';
 
 export default function Agendas() {
@@ -82,7 +82,7 @@ export default function Agendas() {
 
     let query = supabase
       .from('consultas')
-      .select('*, pacientes(nombres, apellidos, cedula)')
+      .select('*, pacientes(nombres, apellidos, cedula, telefono)')
       .gte('fecha_consulta', startOfMonth.toISOString())
       .lte('fecha_consulta', endOfMonth.toISOString())
       .order('fecha_consulta', { ascending: true });
@@ -112,6 +112,33 @@ export default function Agendas() {
     const enlace = `https://Soma.com/medico/${userData?.nombres}-${userData?.apellidos}`.toLowerCase().replace(/\s+/g, '-');
     navigator.clipboard.writeText(enlace);
     alert("Enlace de citas copiado");
+  };
+
+  // ================= ACCIONES RÁPIDAS (WHATSAPP CON MENSAJE PREESTABLECIDO) =================
+  const handleWhatsApp = (cita) => {
+    const telefono = cita.pacientes?.telefono;
+    
+    if (!telefono) return alert("Este paciente no tiene un número de teléfono registrado en el sistema.");
+    
+    // Limpiamos todo lo que no sea número
+    let num = telefono.replace(/\D/g, '');
+    
+    // Lógica para números venezolanos
+    if (num.startsWith('0')) num = '58' + num.substring(1);
+    else if (!num.startsWith('58') && num.length === 10) num = '58' + num;
+    
+    // Extraemos datos de la cita para el mensaje
+    const pacienteNombre = `${cita.pacientes?.nombres} ${cita.pacientes?.apellidos}`;
+    const fechaStr = new Date(cita.fecha_consulta).toLocaleDateString('es-ES');
+    const horaStr = formatHora(cita.fecha_consulta);
+
+    // Mensaje automático (Puedes editarlo a tu gusto)
+    const mensaje = `¡Hola, ${pacienteNombre}! Le escribimos de SOMA para recordarle su cita médica pautada para el día ${fechaStr} a las ${horaStr}. Por favor, confírmenos su asistencia. ¡Saludos!`;
+    
+    // Codificamos el mensaje para formato URL
+    const urlMensaje = encodeURIComponent(mensaje);
+    
+    window.open(`https://wa.me/${num}?text=${urlMensaje}`, '_blank');
   };
 
   const handleGuardarCita = async (e) => {
@@ -198,8 +225,8 @@ export default function Agendas() {
     if (text === 'No Asistió' || text === 'Cancelada') return 'bg-rose-500/10 border-rose-500/30 text-rose-400';
     if (text === 'En Espera') return 'bg-amber-500/10 border-amber-500/30 text-amber-400';
     if (text === 'En Consulta') return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
-    if (text === 'Completada') return 'bg-violet-500/10 border-violet-500/30 text-violet-400'; // Color Morado para finalizadas
-    return 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'; // Agendada
+    if (text === 'Completada') return 'bg-violet-500/10 border-violet-500/30 text-violet-400'; 
+    return 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'; 
   };
 
   const getStatusColorSolid = (cita) => {
@@ -207,8 +234,8 @@ export default function Agendas() {
     if (text === 'No Asistió' || text === 'Cancelada') return 'bg-rose-500';
     if (text === 'En Espera') return 'bg-amber-400';
     if (text === 'En Consulta') return 'bg-emerald-400';
-    if (text === 'Completada') return 'bg-violet-500'; // Color Morado
-    return 'bg-cyan-400'; // Agendada
+    if (text === 'Completada') return 'bg-violet-500'; 
+    return 'bg-cyan-400'; 
   };
 
   // ================= LÓGICA DE CALENDARIO =================
@@ -655,10 +682,21 @@ export default function Agendas() {
               </div>
               
               <div className="p-6 space-y-5">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paciente</p>
-                  <p className="text-lg font-black text-slate-900 dark:text-white">{selectedCita.pacientes?.nombres} {selectedCita.pacientes?.apellidos}</p>
-                  <p className="text-sm font-medium text-slate-500">C.I: {selectedCita.pacientes?.cedula}</p>
+                
+                {/* --- ÁREA DEL PACIENTE CON BOTÓN WHATSAPP --- */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paciente</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white">{selectedCita.pacientes?.nombres} {selectedCita.pacientes?.apellidos}</p>
+                    <p className="text-sm font-medium text-slate-500">C.I: {selectedCita.pacientes?.cedula}</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => handleWhatsApp(selectedCita)}
+                    className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebd53] text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md transition-transform hover:-translate-y-0.5"
+                  >
+                    <MessageCircle size={16} /> WhatsApp
+                  </button>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
