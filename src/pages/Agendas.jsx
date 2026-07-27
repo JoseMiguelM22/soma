@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
-  Home, Users, FileText, Calendar as CalendarIcon, User, Settings, LogOut, 
-  Menu, Sun, Moon, Plus, X, PanelLeft, Clock, 
-  ChevronLeft, ChevronRight, Link as LinkIcon, Check, Activity, MessageCircle
+  Home, Users, FileText, Calendar as CalendarIcon, LogOut, 
+  Menu, Sun, Moon, X, PanelLeft, Clock, 
+  ChevronLeft, ChevronRight, MessageCircle
 } from 'lucide-react';
 
 export default function Agendas() {
@@ -25,6 +25,7 @@ export default function Agendas() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState('Semana'); // 'Semana' o 'Mes'
@@ -33,16 +34,7 @@ export default function Agendas() {
   // ================= ESTADOS DE DATOS =================
   const [userData, setUserData] = useState(null);
   const [citas, setCitas] = useState([]);
-  const [pacientesLista, setPacientesLista] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // ================= MODAL NUEVA CITA =================
-  const [isModalCitaOpen, setIsModalCitaOpen] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-  const [nuevaCita, setNuevaCita] = useState({
-    id_paciente: '', fecha_hora: '', estado: 'Agendada', 
-    consultorio: '', titulo: '', notas: ''
-  });
 
   // ================= MODAL DETALLE DE CITA =================
   const [selectedCita, setSelectedCita] = useState(null);
@@ -50,12 +42,7 @@ export default function Agendas() {
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [actualizandoEstado, setActualizandoEstado] = useState(false);
 
-  const listaConsultorios = ["Medics", "SOMA Principal"];
-
-  useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDarkMode]);
+  const listaConsultorios = ["Hospital cardón"];
 
   // ================= CARGA DE DATOS =================
   const fetchData = async () => {
@@ -66,13 +53,6 @@ export default function Agendas() {
     const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
     if (dbUser) setUserData(dbUser);
     
-    let queryPacientes = supabase.from('pacientes').select('*').order('nombres', { ascending: true });
-    if (dbUser?.rol === 'especialista') {
-      queryPacientes = queryPacientes.eq('id_medico', session.user.id);
-    }
-    const { data: dbPacientes } = await queryPacientes;
-    if (dbPacientes) setPacientesLista(dbPacientes);
-
     cargarCitas(dbUser, session.user.id);
   };
 
@@ -108,65 +88,25 @@ export default function Agendas() {
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
 
-  const copiarEnlace = () => {
-    const enlace = `https://Soma.com/medico/${userData?.nombres}-${userData?.apellidos}`.toLowerCase().replace(/\s+/g, '-');
-    navigator.clipboard.writeText(enlace);
-    alert("Enlace de citas copiado");
-  };
-
-  // ================= ACCIONES RÁPIDAS (WHATSAPP CON MENSAJE PREESTABLECIDO) =================
+  // ================= ACCIONES RÁPIDAS (WHATSAPP) =================
   const handleWhatsApp = (cita) => {
     const telefono = cita.pacientes?.telefono;
     
     if (!telefono) return alert("Este paciente no tiene un número de teléfono registrado en el sistema.");
     
-    // Limpiamos todo lo que no sea número
     let num = telefono.replace(/\D/g, '');
     
-    // Lógica para números venezolanos
     if (num.startsWith('0')) num = '58' + num.substring(1);
     else if (!num.startsWith('58') && num.length === 10) num = '58' + num;
     
-    // Extraemos datos de la cita para el mensaje
     const pacienteNombre = `${cita.pacientes?.nombres} ${cita.pacientes?.apellidos}`;
     const fechaStr = new Date(cita.fecha_consulta).toLocaleDateString('es-ES');
     const horaStr = formatHora(cita.fecha_consulta);
 
-    // Mensaje automático (Puedes editarlo a tu gusto)
     const mensaje = `¡Hola, ${pacienteNombre}! Le escribimos de SOMA para recordarle su cita médica pautada para el día ${fechaStr} a las ${horaStr}. Por favor, confírmenos su asistencia. ¡Saludos!`;
-    
-    // Codificamos el mensaje para formato URL
     const urlMensaje = encodeURIComponent(mensaje);
     
     window.open(`https://wa.me/${num}?text=${urlMensaje}`, '_blank');
-  };
-
-  const handleGuardarCita = async (e) => {
-    e.preventDefault();
-    setGuardando(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const fechaObj = new Date(nuevaCita.fecha_hora);
-
-      const { error } = await supabase.from('consultas').insert([{
-        id_medico: session.user.id,
-        id_paciente: nuevaCita.id_paciente,
-        fecha_consulta: fechaObj.toISOString(),
-        estado: nuevaCita.estado,
-        motivo: nuevaCita.titulo || nuevaCita.notas || 'Cita Programada'
-      }]);
-
-      if (error) throw error;
-      
-      setIsModalCitaOpen(false);
-      setNuevaCita({ id_paciente: '', fecha_hora: '', estado: 'Agendada', consultorio: '', titulo: '', notas: '' });
-      fetchData();
-      alert("Cita agendada correctamente.");
-    } catch (err) {
-      alert("Error al agendar cita: " + err.message);
-    } finally {
-      setGuardando(false);
-    }
   };
 
   // ================= ACTUALIZACIÓN DE ESTADOS =================
@@ -455,32 +395,6 @@ export default function Agendas() {
                     {listaConsultorios.map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
-
-                <button onClick={() => setIsModalCitaOpen(true)} className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2 ml-auto xl:ml-2">
-                  <Plus size={18} /> Nueva Cita
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-[#f0f9ff] dark:bg-cyan-900/10 border border-cyan-100 dark:border-cyan-900/30 rounded-2xl p-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white dark:bg-[#1a1a1a] rounded-full flex items-center justify-center shrink-0 shadow-sm border border-cyan-100 dark:border-cyan-900/30">
-                  <LinkIcon className="text-[#0081a7] dark:text-cyan-400" size={24} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Enlace de tu página web y de citas</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Tus pacientes pueden agendar citas directamente.</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="text" readOnly 
-                  value={`https://Soma.com/medico/${userData?.nombres?.toLowerCase().replace(/\s+/g, '-') || 'demo'}`} 
-                  className="hidden sm:block px-4 py-2 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-500 w-80 outline-none"
-                />
-                <button onClick={copiarEnlace} className="flex items-center gap-2 px-5 py-2 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 hover:border-cyan-500 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-bold transition-colors w-full md:w-auto justify-center shadow-sm">
-                  Copiar enlace
-                </button>
               </div>
             </div>
 
@@ -603,71 +517,6 @@ export default function Agendas() {
           </div>
         </div>
       </main>
-
-      {/* ================= MODAL AGENDAR CITA ================= */}
-      {isModalCitaOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
-           <div className="bg-white dark:bg-[#111111] w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col">
-              
-              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Agendar nueva cita</h2>
-                <button onClick={() => setIsModalCitaOpen(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-full transition-colors"><X size={18} /></button>
-              </div>
-              
-              <div className="p-6 overflow-y-auto custom-scrollbar">
-                <form id="formNuevaCita" onSubmit={handleGuardarCita} className="space-y-5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Paciente *</label>
-                    <select required value={nuevaCita.id_paciente} onChange={(e) => setNuevaCita({...nuevaCita, id_paciente: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all">
-                      <option value="">Seleccione o busque un paciente...</option>
-                      {pacientesLista.map(p => <option key={p.id} value={p.id}>{p.nombres} {p.apellidos} - {p.cedula}</option>)}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha y hora *</label>
-                      <input type="datetime-local" value={nuevaCita.fecha_hora} onChange={(e) => setNuevaCita({...nuevaCita, fecha_hora: e.target.value})} required className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all [&::-webkit-calendar-picker-indicator]:dark:invert" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Estado Inicial</label>
-                      <select value={nuevaCita.estado} onChange={(e) => setNuevaCita({...nuevaCita, estado: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all">
-                        <option value="Agendada">Agendada (Pendiente)</option>
-                        <option value="En Espera">En Espera (En Sala)</option>
-                        <option value="Finalizada">Finalizada (Completada)</option>
-                        <option value="Cancelada">Cancelada</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Consultorio (opcional)</label>
-                      <select value={nuevaCita.consultorio} onChange={(e) => setNuevaCita({...nuevaCita, consultorio: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all">
-                        <option value="Sin especificar">Sin especificar</option>
-                        {listaConsultorios.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Título (opcional)</label>
-                      <input type="text" value={nuevaCita.titulo} onChange={(e) => setNuevaCita({...nuevaCita, titulo: e.target.value})} placeholder="Ej. Control..." className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Notas (opcional)</label>
-                    <textarea rows="3" value={nuevaCita.notas} onChange={(e) => setNuevaCita({...nuevaCita, notas: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all resize-none custom-scrollbar" placeholder="Instrucciones previas o notas internas..."></textarea>
-                  </div>
-                </form>
-              </div>
-              
-              <div className="p-6 border-t border-slate-100 dark:border-white/5 flex gap-3 justify-end bg-slate-50 dark:bg-[#161616]">
-                <button type="button" onClick={() => setIsModalCitaOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors text-sm">Cancelar</button>
-                <button type="submit" form="formNuevaCita" disabled={guardando} className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-2.5 rounded-xl font-bold shadow-md disabled:opacity-50 text-sm flex items-center gap-2">
-                  {guardando ? 'Guardando...' : <><Check size={16}/> Guardar cita</>}
-                </button>
-              </div>
-
-           </div>
-        </div>
-      )}
 
       {/* ================= MODAL DETALLE Y CONTROL DE CITA ================= */}
       {selectedCita && (
