@@ -42,7 +42,7 @@ export default function Agendas() {
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [actualizandoEstado, setActualizandoEstado] = useState(false);
 
-  const listaConsultorios = ["Hospital cardón"];
+  const listaConsultorios = ["Medics", "SOMA Principal"];
 
   // ================= CARGA DE DATOS =================
   const fetchData = async () => {
@@ -87,6 +87,9 @@ export default function Agendas() {
     if (!userData || !userData.nombres || !userData.apellidos) return "DR";
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
+
+  // Variable maestra para saber si es Especialista
+  const esEspecialista = userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase());
 
   // ================= ACCIONES RÁPIDAS (WHATSAPP) =================
   const handleWhatsApp = (cita) => {
@@ -311,21 +314,23 @@ export default function Agendas() {
               <Link to="/agenda" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors">
                 <CalendarIcon size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}
               </Link>
-              
             </nav>
           </div>
         </div>
 
+        {/* ================= PERFIL DE USUARIO UNIFICADO ================= */}
         <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white">
+            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
               {userData ? getInitials() : '...'}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">{userData?.rol || 'Rol'}</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">
+                  {esEspecialista ? 'ESPECIALISTA' : 'DPTO. HISTORIAS'}
+                </p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
+                  {esEspecialista ? 'Dr(a). ' : ''}{userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
                 </p>
               </div>
             )}

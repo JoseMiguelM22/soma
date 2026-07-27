@@ -4,10 +4,9 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, LogOut, 
   Menu, Sun, Moon, PanelLeft, Clock, ArrowLeft, CheckCircle, 
-  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, CheckCircle2, Check
+  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, CheckCircle2, Check, MessageCircle, Phone
 } from 'lucide-react';
 
-// === IMPORTAMOS TUS COMPONENTES ===
 import Parte1 from './Parte1';
 import Parte2 from './Parte2';
 import Parte3 from './Parte3';
@@ -15,7 +14,6 @@ import Parte3 from './Parte3';
 export default function DashboardAdmision() {
   const navigate = useNavigate();
   
-  // ================= ESTADOS DE UI CON MEMORIA (LOCALSTORAGE) =================
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     return savedTheme === 'light' ? false : true; 
@@ -35,10 +33,16 @@ export default function DashboardAdmision() {
   const [citasProximas, setCitasProximas] = useState([]);
   const [listaMedicos, setListaMedicos] = useState([]);
 
-  // ESTADO MASIVO DEL FORMULARIO 15-108
-  const [formIVSS, setFormIVSS] = useState({
+  // 🔥 ESTADOS PARA EL MODAL DE WHATSAPP 🔥
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [tempPacienteId, setTempPacienteId] = useState(null);
+  const [patientPhone, setPatientPhone] = useState('');
+  const [consultaCreada, setConsultaCreada] = useState(null); // <--- NUEVO: Para guardar la info y pasarla a Historias
+
+  const initialFormIVSS = {
     centro_asistencial: '', historia_n: '', servicio: '', piso: '', ala: '', sala_cuarto: '', cama: '',
     apellidos_nombres: '', cedula: '', sexo: '', edad: '', edo_civil: '', lugar_nacimiento: '', fecha_nacimiento: '', nacionalidad: '', ocupacion: '', direccion_habitacion: '',
+    telefono: '',
     emergencia_nombre: '', emergencia_parentesco: '', emergencia_direccion: '', fecha_ingreso: new Date().toISOString().split('T')[0], hora_ingreso: '', fecha_admision_anterior: '',
     motivo_ingreso: '', enfermedad_actual: '', diagnostico_provisional: '', diagnostico_clinico_final: '', diagnostico_anatomo: '',
     temperatura: '', pulso: '', respiracion: '', ta_mx: '', ta_mn: '', peso: '', talla: '',
@@ -46,11 +50,11 @@ export default function DashboardAdmision() {
     fecha_autorizacion1: '', firma_autorizacion1: '', testigo_autorizacion1: '', parentesco_autorizacion1: '',
     fecha_autorizacion2: '', firma_autorizacion2: '', testigo_autorizacion2: '', parentesco_autorizacion2: '',
     fecha_examen: '', examen_practicado_por: '', diagnostico_servicio: ''
-  });
+  };
 
+  const [formIVSS, setFormIVSS] = useState(initialFormIVSS);
   const [marcas, setMarcas] = useState({});
 
-  // Aplicar Modo Oscuro y guardar en memoria
   useEffect(() => { 
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -102,7 +106,6 @@ export default function DashboardAdmision() {
   const handleLogout = async () => { await supabase.auth.signOut(); navigate('/login'); };
   const getInitials = () => { if (!userData) return "AS"; return `${userData.nombres?.charAt(0) || ''}${userData.apellidos?.charAt(0) || ''}`.toUpperCase(); };
 
-  // ================= CALCULADORA DE ALERTAS DE TIEMPO (VENEZUELA) =================
   const getAlertaCita = (fechaStr) => {
     if (!fechaStr) return { texto: "Sin hora", color: "text-slate-500", bg: "bg-slate-500/10", alert: false };
     
@@ -121,7 +124,6 @@ export default function DashboardAdmision() {
     return { texto: `${horaFormateada} (En ${horas}h ${mins}m)`, color: 'text-emerald-500', bg: 'bg-emerald-500/10', alert: false };
   };
 
-  // ================= ACCIONES DE ESTADO =================
   const handleMarcarLlegada = async (consultaId) => {
     try {
       const { error } = await supabase.from('consultas').update({ estado: 'En Espera' }).eq('id', consultaId);
@@ -136,7 +138,6 @@ export default function DashboardAdmision() {
     } catch (error) { alert("Error al marcar como atendido: " + error.message); }
   };
 
-  // ================= MANEJADORES DE FORMATO =================
   const handleIVSSChange = (e) => setFormIVSS(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const toggleMarca = (id) => {
     setMarcas(prev => {
@@ -186,11 +187,14 @@ export default function DashboardAdmision() {
 
     try {
       let pacienteId = null;
-      const { data: pacientesExistentes, error: errBusqueda } = await supabase.from('pacientes').select('id').eq('cedula', formIVSS.cedula);
+      let existingPhone = '';
+
+      const { data: pacientesExistentes, error: errBusqueda } = await supabase.from('pacientes').select('id, telefono').eq('cedula', formIVSS.cedula);
       if (errBusqueda) throw errBusqueda;
 
       if (pacientesExistentes && pacientesExistentes.length > 0) {
         pacienteId = pacientesExistentes[0].id;
+        existingPhone = pacientesExistentes[0].telefono || '';
       } else {
         let nombresDB = ''; let apellidosDB = ''; 
         if (formIVSS.apellidos_nombres.includes(" ")) {
@@ -201,15 +205,11 @@ export default function DashboardAdmision() {
         } else { nombresDB = formIVSS.apellidos_nombres; apellidosDB = "-"; }
 
         const sexoStr = marcas['sexo_m'] === 'X' ? 'Masculino' : (marcas['sexo_f'] === 'X' ? 'Femenino' : null);
+        let fechaNacDB = formIVSS.fecha_nacimiento ? formIVSS.fecha_nacimiento : null;
         
-        let fechaNacDB = null;
-        if (formIVSS.fecha_nacimiento) {
-          const matchFecha = formIVSS.fecha_nacimiento.trim().match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-          if (matchFecha) fechaNacDB = `${matchFecha[3]}-${matchFecha[2].padStart(2, '0')}-${matchFecha[1].padStart(2, '0')}`;
-          else fechaNacDB = formIVSS.fecha_nacimiento;
-        }
-        
-        const { data: nuevoPaciente, error: errCrear } = await supabase.from('pacientes').insert([{ nombres: nombresDB, apellidos: apellidosDB, cedula: formIVSS.cedula, sexo: sexoStr, fecha_nacimiento: fechaNacDB }]).select().single();
+        const { data: nuevoPaciente, error: errCrear } = await supabase.from('pacientes').insert([{ 
+          nombres: nombresDB, apellidos: apellidosDB, cedula: formIVSS.cedula, sexo: sexoStr, fecha_nacimiento: fechaNacDB, telefono: formIVSS.telefono 
+        }]).select().single();
         if (errCrear) throw errCrear;
         pacienteId = nuevoPaciente.id;
         await supabase.from('historias_clinicas').insert([{ id_paciente: pacienteId }]);
@@ -221,42 +221,127 @@ export default function DashboardAdmision() {
       const horaIngreso = formIVSS.hora_ingreso || '00:00';
       const signosFormateados = `TA: ${formIVSS.ta_mx}/${formIVSS.ta_mn} | FC: ${formIVSS.pulso} | FR: ${formIVSS.respiracion} | Temp: ${formIVSS.temperatura}°C | Peso: ${formIVSS.peso}kg`;
 
-      const { error: errConsulta } = await supabase.from('consultas').insert([{
+      // 🔥 AQUÍ OBTENEMOS LA CONSULTA RECIÉN CREADA CON SUS DATOS Y PACIENTE 🔥
+      const { data: nuevaConsulta, error: errConsulta } = await supabase.from('consultas').insert([{
         id_paciente: pacienteId, id_medico: idMedicoTemporal, estado: 'En Espera', 
         motivo: formIVSS.motivo_ingreso || 'Ingreso Forma 15-108', signos_vitales: signosFormateados,
         fecha_consulta: new Date(`${fechaIngreso}T${horaIngreso}:00`).toISOString(),
         nota_clinica: htmlParaMedico, datos_formulario: { formIVSS, marcas }
-      }]);
+      }]).select('*, pacientes(*)').single();
 
       if (errConsulta) throw errConsulta;
 
-      alert('¡Formato Forma 15-108 Guardado Correctamente en la Historia Clínica del Paciente!');
-      setFormIVSS({
-        centro_asistencial: '', historia_n: '', servicio: '', piso: '', ala: '', sala_cuarto: '', cama: '',
-        apellidos_nombres: '', cedula: '', sexo: '', edad: '', edo_civil: '', lugar_nacimiento: '', fecha_nacimiento: '', nacionalidad: '', ocupacion: '', direccion_habitacion: '',
-        emergencia_nombre: '', emergencia_parentesco: '', emergencia_direccion: '', fecha_ingreso: new Date().toISOString().split('T')[0], hora_ingreso: '', fecha_admision_anterior: '',
-        motivo_ingreso: '', enfermedad_actual: '', diagnostico_provisional: '', diagnostico_clinico_final: '', diagnostico_anatomo: '',
-        temperatura: '', pulso: '', respiracion: '', ta_mx: '', ta_mn: '', peso: '', talla: '', desc_parte2_1: '', desc_parte2_2: '', desc_parte3_1: '', desc_parte3_2: '',
-        fecha_autorizacion1: '', firma_autorizacion1: '', testigo_autorizacion1: '', parentesco_autorizacion1: '', fecha_autorizacion2: '', firma_autorizacion2: '', testigo_autorizacion2: '', parentesco_autorizacion2: '',
-        fecha_examen: '', examen_practicado_por: '', diagnostico_servicio: ''
-      });
+      // Limpiamos el formulario en el fondo
+      setFormIVSS(initialFormIVSS);
       setMarcas({});
-      setVistaActual('inicio');
-      fetchData(); 
+      setGuardando(false);
 
-    } catch (error) { alert("Error al guardar formato: " + error.message); } finally { setGuardando(false); }
+      // Guardamos la consulta y abrimos el Modal de WhatsApp
+      setConsultaCreada(nuevaConsulta);
+      setTempPacienteId(pacienteId);
+      setPatientPhone(existingPhone);
+      setShowPhoneModal(true);
+
+    } catch (error) { 
+      alert("Error al guardar formato: " + error.message); 
+      setGuardando(false);
+    }
+  };
+
+  // 🔥 FUNCIONES DEL MODAL DE WHATSAPP 🔥
+  const handleSavePhone = async () => {
+    if (!patientPhone) {
+      handleSkipPhone();
+      return;
+    }
+    setGuardando(true);
+    try {
+      const { error } = await supabase.from('pacientes').update({ telefono: patientPhone }).eq('id', tempPacienteId);
+      if (error) throw error;
+      
+      // Actualizamos el teléfono en el objeto de la consulta que viajara a Historias Clínicas
+      if (consultaCreada && consultaCreada.pacientes) {
+        consultaCreada.pacientes.telefono = patientPhone;
+      }
+      
+      handleSkipPhone(); 
+    } catch (error) {
+      alert("Hubo un error al guardar el teléfono.");
+      setGuardando(false);
+    }
+  };
+
+  const handleSkipPhone = () => {
+    setShowPhoneModal(false);
+    setTempPacienteId(null);
+    setPatientPhone('');
+    setGuardando(false);
+    setVistaActual('inicio');
+    
+    // 🔥 REDIRECCIÓN INTELIGENTE MANDANDO LOS DATOS DE LA CONSULTA 🔥
+    navigate('/historias', { state: { autoOpenConsulta: consultaCreada } });
   };
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />}
       
+      {/* ================= MODAL INTELIGENTE DE WHATSAPP ================= */}
+      {showPhoneModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden text-center">
+            
+            <div className="p-8 pb-4">
+              <div className="w-16 h-16 bg-[#25D366]/20 text-[#25D366] rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-[#25D366]/30">
+                <MessageCircle size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">¡Historia Creada!</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                Para poder enviar recordatorios de citas o contactar al paciente, es ideal registrar su número de WhatsApp.
+              </p>
+              
+              <div className="text-left">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Número de Teléfono / WhatsApp</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text" 
+                    value={patientPhone} 
+                    onChange={(e) => setPatientPhone(e.target.value)} 
+                    placeholder="Ej. 04141234567" 
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#25D366] transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-slate-50 dark:bg-[#111111] border-t border-slate-200 dark:border-white/5 flex flex-col gap-3">
+              <button 
+                onClick={handleSavePhone} 
+                disabled={guardando} 
+                className="w-full bg-[#25D366] hover:bg-[#1ebd53] text-white px-5 py-3 rounded-xl font-black shadow-lg transition-transform hover:-translate-y-1 flex items-center justify-center gap-2"
+              >
+                {guardando ? 'Guardando...' : 'Guardar y Continuar'}
+              </button>
+              <button 
+                onClick={handleSkipPhone} 
+                disabled={guardando} 
+                className="w-full text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white text-sm font-bold transition-colors"
+              >
+                Omitir por ahora
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* ================= SIDEBAR ================= */}
       <aside className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#16161a] border-r border-slate-200/80 dark:border-white/[0.04] flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 md:m-4 md:mr-0 md:rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} ${isCollapsed ? 'md:w-24' : 'md:w-68'}`}>
         <div>
           <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
             <Link className="flex items-center overflow-hidden whitespace-nowrap" to="/admision">
-              {isCollapsed ? <span className="text-emerald-500 text-3xl mb-1 font-black">*</span> : <><img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden" /><img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block" /></>}
+              {isCollapsed ? <span className="text-emerald-500 text-3xl mb-1 font-black">*</span> : <><img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden transition-opacity duration-300" /><img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block transition-opacity duration-300" /></>}
             </Link>
             {!isCollapsed && <button className="md:hidden text-slate-400 hover:text-rose-500" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>}
           </div>
@@ -290,8 +375,6 @@ export default function DashboardAdmision() {
             <button className="text-slate-500 dark:text-slate-400 hover:text-cyan-600 md:hidden p-2 rounded-xl" onClick={() => setIsSidebarOpen(true)}><Menu size={24}/></button>
             <button className="hidden md:flex p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10" onClick={() => setIsCollapsed(!isCollapsed)}><PanelLeft size={18}/></button>
           </div>
-          
-          {/* BOTÓN MODO OSCURO ARREGLADO */}
           <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 text-slate-400 hover:text-cyan-600 dark:hover:text-yellow-400 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl transition-colors">
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
@@ -314,10 +397,8 @@ export default function DashboardAdmision() {
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Acciones Rápidas</h3>
                 
-                {/* === BOTONERA DE ACCIONES RÁPIDAS === */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full relative">
                   
-                  {/* Botón desplegable Crear Historia (Verde) */}
                   <div className="relative w-full">
                     <button onClick={() => setShowFormatos(!showFormatos)} className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#10b981] hover:bg-[#059669] text-white rounded-xl font-bold shadow-md hover:-translate-y-1 transition-transform">
                       <FilePlus size={20}/> <span className="text-sm sm:text-base">Crear Historia</span> <ChevronDown size={18} className={`transition-transform ${showFormatos ? 'rotate-180' : ''}`} />
@@ -341,12 +422,10 @@ export default function DashboardAdmision() {
                     )}
                   </div>
 
-                  {/* Accesos Directos - Historias (Azul) */}
                   <button onClick={() => navigate('/historias')} className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white rounded-xl font-bold shadow-md hover:-translate-y-1 transition-transform">
                     <FileText size={20} /> <span className="text-sm sm:text-base">Historias Clínicas</span>
                   </button>
 
-                  {/* Accesos Directos - Agenda (Morado) */}
                   <button onClick={() => navigate('/agenda')} className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-xl font-bold shadow-md hover:-translate-y-1 transition-transform">
                     <Calendar size={20} /> <span className="text-sm sm:text-base">Agenda</span>
                   </button>
@@ -355,7 +434,6 @@ export default function DashboardAdmision() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* PANEL PACIENTES DE HOY */}
                 <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/[0.04] rounded-[2rem] p-8 flex flex-col shadow-sm min-h-[380px] max-h-[600px]">
                   <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-white/[0.04] pb-4 shrink-0">
                     <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white"><Clock className="text-[#10b981]" size={20}/> Pacientes de Hoy</h3>
@@ -380,7 +458,6 @@ export default function DashboardAdmision() {
                                 <div>
                                   <h4 className="font-bold text-slate-900 dark:text-white text-lg">{cita.pacientes?.nombres} {cita.pacientes?.apellidos}</h4>
                                   
-                                  {/* ALERTA DE TIEMPO (RELOJ VENEZUELA) */}
                                   <p className={`text-[11px] font-bold mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md ${alerta.bg} ${alerta.color}`}>
                                     {alerta.alert && !esCompletada ? <AlertCircle size={12}/> : <Clock size={12}/>} 
                                     {alerta.texto}
@@ -392,7 +469,6 @@ export default function DashboardAdmision() {
                                 </span>
                               </div>
                               
-                              {/* BOTONERA DINÁMICA DE FLUJO */}
                               <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
                                 {cita.estado === 'Agendada' && (
                                   <button onClick={() => handleMarcarLlegada(cita.id)} className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2.5 rounded-xl text-sm font-bold shadow-md transition-colors">

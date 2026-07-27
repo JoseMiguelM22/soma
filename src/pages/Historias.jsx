@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom'; // <--- AÑADIDO useLocation
 import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, LogOut, 
@@ -14,6 +14,7 @@ import Parte3 from './Parte3';
 
 export default function Historias() {
   const navigate = useNavigate();
+  const location = useLocation(); // <--- AÑADIDO: Para leer la redirección mágica
   
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -44,11 +45,13 @@ export default function Historias() {
   const [listaEspecialistas, setListaEspecialistas] = useState([]);
   const [especialistaSelect, setEspecialistaSelect] = useState("");
   
+  const [busquedaEspecialista, setBusquedaEspecialista] = useState(""); 
+  const [dropdownAbierto, setDropdownAbierto] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [guardando, setGuardando] = useState(false);
 
-  // === ESTADOS PARA PDF MÉDICOS ===
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
   const [isConstanciaModalOpen, setIsConstanciaModalOpen] = useState(false);
   const [textoRecipe, setTextoRecipe] = useState('');
@@ -74,7 +77,6 @@ export default function Historias() {
   const [formIVSS, setFormIVSS] = useState(initialFormIVSS);
   const [marcas, setMarcas] = useState({});
 
-  // 🔥 NUEVOS ESTADOS PARA GUARDAR LA "FOTO" INICIAL DE LOS DATOS
   const [initialFormSnapshot, setInitialFormSnapshot] = useState(null);
   const [initialMarcasSnapshot, setInitialMarcasSnapshot] = useState(null);
 
@@ -116,6 +118,23 @@ export default function Historias() {
 
   useEffect(() => { fetchData(); }, [navigate]);
 
+  // 🔥 NUEVO: EFECTO QUE RECIBE LA REDIRECCIÓN Y ABRE AUTOMÁTICAMENTE EL MODAL 🔥
+  useEffect(() => {
+    if (location.state?.autoOpenConsulta && !loading) {
+      const c = location.state.autoOpenConsulta;
+      const pac = Array.isArray(c.pacientes) ? c.pacientes[0] : c.pacientes;
+      
+      if (pac) {
+        setPacienteSeleccionado(pac);
+        // Pequeño retraso para asegurar que React actualice el estado
+        setTimeout(() => abrirEditorHistoria(c, pac.id), 100);
+      }
+      
+      // Limpiamos el state para que no se vuelva a abrir si el usuario recarga la página
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, loading, navigate, location.pathname]);
+
   const handleLogout = async () => { await supabase.auth.signOut(); navigate('/login'); };
   const getInitials = () => { if (!userData) return "AD"; return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase(); };
   
@@ -128,19 +147,15 @@ export default function Historias() {
     return `${String(fecha.getDate()).padStart(2, '0')} de ${meses[fecha.getMonth()]} de ${fecha.getFullYear()} a las ${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
   };
 
-  // 🔥 LÓGICA DE BLOQUEO SELECTIVO PARA INPUTS DE TEXTO
   const handleIVSSChange = (e) => {
     const { name, value } = e.target;
-    // Si es especialista y en el snapshot inicial este campo YA TENÍA algo escrito, bloqueamos el cambio.
     if (esEspecialista && initialFormSnapshot && initialFormSnapshot[name] && initialFormSnapshot[name] !== '') {
       return; 
     }
     setFormIVSS(prev => ({ ...prev, [name]: value }));
   };
 
-  // 🔥 LÓGICA DE BLOQUEO SELECTIVO PARA CHECKBOXES/MARCAS
   const toggleMarca = (id) => {
-    // Si es especialista y la marca YA ESTABA seleccionada en el snapshot inicial, bloqueamos el cambio.
     if (esEspecialista && initialMarcasSnapshot && initialMarcasSnapshot[id]) {
       return; 
     }
@@ -155,14 +170,12 @@ export default function Historias() {
       if (consulta.datos_formulario) {
         const parsed = typeof consulta.datos_formulario === 'string' ? JSON.parse(consulta.datos_formulario) : consulta.datos_formulario;
         
-        // Cargar datos actuales
         const loadedForm = parsed.formIVSS || initialFormIVSS;
         const loadedMarcas = parsed.marcas || {};
         
         setFormIVSS(loadedForm); 
         setMarcas(loadedMarcas);
         
-        // 🔥 TOMAR SNAPSHOT PARA BLOQUEO SELECTIVO
         setInitialFormSnapshot(loadedForm);
         setInitialMarcasSnapshot(loadedMarcas);
         
@@ -200,11 +213,30 @@ export default function Historias() {
       };
 
       let error;
-      if (historiaData.id) { const res = await supabase.from('consultas').update(payload).eq('id', historiaData.id); error = res.error; } 
-      else { const res = await supabase.from('consultas').insert([payload]); error = res.error; }
+      let dataToOpen = null;
+
+      if (historiaData.id) { 
+        const res = await supabase.from('consultas').update(payload).eq('id', historiaData.id).select('*, pacientes(*)').single(); 
+        error = res.error; 
+        dataToOpen = res.data;
+      } else { 
+        const res = await supabase.from('consultas').insert([payload]).select('*, pacientes(*)').single(); 
+        error = res.error; 
+        dataToOpen = res.data;
+      }
 
       if (error) throw error;
-      await fetchData(); setIsModalConsultaOpen(false); 
+      await fetchData(); 
+
+      // Mantenemos el modal abierto si acabamos de guardar
+      if (dataToOpen) {
+        const pac = Array.isArray(dataToOpen.pacientes) ? dataToOpen.pacientes[0] : dataToOpen.pacientes;
+        if (pac && !pacienteSeleccionado) {
+          setPacienteSeleccionado(pac);
+        }
+        abrirEditorHistoria(dataToOpen, pac ? pac.id : historiaData.id_paciente);
+      }
+
       alert(esEspecialista ? "¡Cambios del especialista guardados y consulta completada!" : "¡Formato guardado exitosamente!");
     } catch (error) { alert("Error al guardar: " + error.message); } finally { setGuardando(false); }
   };
@@ -214,13 +246,16 @@ export default function Historias() {
     try {
       const { error } = await supabase.from('consultas').update({ id_medico: especialistaSelect, estado: 'En Espera' }).eq('id', historiaData.id);
       if (error) throw error;
-      alert("¡Historia remitida correctamente!"); setIsRemitirModalOpen(false); setEspecialistaSelect(""); fetchData(); 
+      alert("¡Historia remitida correctamente!"); 
+      setIsRemitirModalOpen(false); 
+      setEspecialistaSelect(""); 
+      setBusquedaEspecialista(""); 
+      fetchData(); 
     } catch (error) { alert("Error al remitir."); } finally { setGuardando(false); }
   };
 
   const handleImprimirPDF = () => window.print();
 
-  // ================= LÓGICA DE PDF (RÉCIPE / CONSTANCIA) =================
   const generarPDF = (tipo) => {
     if (tipo === 'recipe' && !textoRecipe.trim() && !textoIndicaciones.trim()) return alert("Debes escribir algo en el récipe.");
     if (tipo === 'constancia' && !textoInforme.trim()) return alert("Debes escribir el contenido de la constancia.");
@@ -283,6 +318,13 @@ export default function Historias() {
     return item.paciente.nombres.toLowerCase().includes(term) || item.paciente.apellidos.toLowerCase().includes(term) || (item.paciente.cedula && item.paciente.cedula.includes(term));
   });
 
+  const especialistasFiltrados = listaEspecialistas.filter(med => {
+    const searchTerm = busquedaEspecialista.toLowerCase();
+    const nombreCompleto = `${med.nombres || ''} ${med.apellidos || ''}`.toLowerCase();
+    const especialidad = (med.especialidad || '').toLowerCase();
+    return nombreCompleto.includes(searchTerm) || especialidad.includes(searchTerm);
+  });
+
   const consultasDelPaciente = pacienteSeleccionado ? consultas.filter(c => c.id_paciente === pacienteSeleccionado.id) : [];
 
   return (
@@ -292,20 +334,76 @@ export default function Historias() {
       {/* MODAL REMITIR ESPECIALISTA */}
       {isRemitirModalOpen && !esEspecialista && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-          <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-[fadeIn_0.2s_ease-out]">
-            <div className="p-6 border-b border-slate-200 dark:border-white/5"><h3 className="text-lg font-bold">Remitir Historia a Especialista</h3><p className="text-sm text-slate-500 mt-1">Selecciona el médico evaluador.</p></div>
-            <div className="p-6">
-              <label className="block text-xs font-bold mb-2">Especialista disponible</label>
-              <select value={especialistaSelect} onChange={(e) => setEspecialistaSelect(e.target.value)} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0a0a0a] border border-slate-200 dark:border-white/10 rounded-xl outline-none">
-                <option value="">Seleccione un médico...</option>
-                {listaEspecialistas.map(med => (
-                  <option key={med.id_auth} value={med.id_auth}>
-                    Dr(a). {med.nombres} {med.apellidos} - {med.especialidad || 'Sin especialidad'}
-                  </option>
-                ))}
-              </select>
+          <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out]">
+            
+            <div className="p-6 border-b border-slate-200 dark:border-white/5 rounded-t-2xl">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Remitir Historia a Especialista</h3>
+              <p className="text-sm text-slate-500 mt-1">Selecciona el médico evaluador.</p>
             </div>
-            <div className="p-4 bg-slate-50 dark:bg-[#111111] border-t border-slate-200 dark:border-white/5 flex justify-end gap-3"><button onClick={() => setIsRemitirModalOpen(false)} className="px-4 py-2 font-bold">Cancelar</button><button onClick={handleConfirmarRemision} disabled={!especialistaSelect || guardando} className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-bold">{guardando ? 'Remitiendo...' : 'Confirmar Remisión'}</button></div>
+            
+            <div className="p-6">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Especialista disponible</label>
+              
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o especialidad..."
+                  value={busquedaEspecialista}
+                  onChange={(e) => {
+                    setBusquedaEspecialista(e.target.value);
+                    setEspecialistaSelect(""); 
+                    setDropdownAbierto(true);
+                  }}
+                  onFocus={() => setDropdownAbierto(true)}
+                  onBlur={() => setTimeout(() => setDropdownAbierto(false), 200)} 
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
+                />
+
+                {dropdownAbierto && (
+                  <ul className="absolute z-50 w-full mt-2 max-h-48 overflow-y-auto bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl custom-scrollbar">
+                    {especialistasFiltrados.length > 0 ? (
+                      especialistasFiltrados.map(med => (
+                        <li 
+                          key={med.id_auth}
+                          onClick={() => {
+                            setEspecialistaSelect(med.id_auth);
+                            setBusquedaEspecialista(`Dr(a). ${med.nombres} ${med.apellidos}`);
+                            setDropdownAbierto(false);
+                          }}
+                          className="px-4 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 last:border-0 transition-colors"
+                        >
+                          <div className="font-bold text-sm text-slate-900 dark:text-white">Dr(a). {med.nombres} {med.apellidos}</div>
+                          <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">{med.especialidad || 'Sin especialidad'}</div>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-4 py-3 text-sm text-slate-500 text-center">No se encontraron especialistas</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-4 bg-slate-50 dark:bg-[#111111] border-t border-slate-200 dark:border-white/5 flex justify-end gap-3 rounded-b-2xl">
+              <button 
+                onClick={() => {
+                  setIsRemitirModalOpen(false);
+                  setBusquedaEspecialista(""); 
+                  setEspecialistaSelect("");
+                }} 
+                className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleConfirmarRemision} 
+                disabled={!especialistaSelect || guardando} 
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors disabled:opacity-50"
+              >
+                {guardando ? 'Remitiendo...' : 'Confirmar Remisión'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -351,26 +449,24 @@ export default function Historias() {
           </div>
         </div>
         
-        {/* ================= PERFIL DE USUARIO EN SIDEBAR ================= */}
-        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
-          <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-slate-300 dark:border-white/20">
-              {getInitials()}
+        <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+          <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
+              {userData ? getInitials() : '...'}
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
-                  {esEspecialista ? 'MÉDICO' : 'Dpto. Historias'}
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">
+                  {userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase()) ? 'ESPECIALISTA' : 'DPTO. HISTORIAS'}
                 </p>
                 <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-                  {esEspecialista ? 'Dr(a).' : ''} {userData?.nombres || 'Usuario'} {userData?.apellidos || ''}
+                  {userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase()) ? 'Dr(a). ' : ''}{userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
                 </p>
               </div>
             )}
           </div>
-          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-            <LogOut size={18} className="shrink-0" />
-            {!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+            <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
           </button>
         </div>
       </aside>
@@ -385,6 +481,7 @@ export default function Historias() {
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
                 <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div><h2 className="text-3xl font-black text-white mb-2 tracking-tight">Historias clínicas</h2><p className="text-cyan-100 text-sm font-medium">Filtra por rango, busca por paciente y abre cada historia para verla.</p></div>
+                  {!esEspecialista && (<button onClick={() => abrirEditorHistoria(null)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><Plus size={18} /> Nueva historia 15-108</button>)}
                 </div>
                 <div className="p-8">
                   <div className="mb-6"><div className="flex justify-between items-end mb-4"><div><h3 className="text-lg font-bold">Pacientes con Historial</h3></div></div><div className="flex flex-col md:flex-row gap-4"><div className="relative flex-1"><Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} /><input type="text" placeholder="Buscar por nombre o cédula..." className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}/></div></div></div>
@@ -418,6 +515,9 @@ export default function Historias() {
                   
                   {/* ====== BOTONERA SUPERIOR SEGÚN ROL ====== */}
                   <div className="flex flex-wrap items-center gap-3">
+                    {!esEspecialista && (
+                      <button onClick={() => abrirEditorHistoria(null, pacienteSeleccionado.id)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><Plus size={18} /> Nuevo Formato 15-108</button>
+                    )}
                     {esEspecialista && (
                       <>
                         <button onClick={() => setIsRecipeModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><FlaskConical size={18} /> Redactar Récipe</button>

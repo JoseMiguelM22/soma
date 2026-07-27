@@ -235,18 +235,27 @@ export default function Pacientes() {
             </nav>
           </div>
         </div>
-        <div className={`p-4 border-t border-slate-100 dark:border-white/[0.04] flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
-          <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-            <div className="w-9 h-9 shrink-0 rounded-full bg-slate-200 dark:bg-white/90 text-slate-900 flex items-center justify-center text-xs font-bold border border-white/20">{getInitials()}</div>
-            {!isCollapsed && (
-              <div className="overflow-hidden">
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">{userData?.rol || 'Usuario'}</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">{userData?.nombres || 'Usuario'} {userData?.apellidos || ''}</p>
-              </div>
-            )}
-          </div>
-          <button onClick={handleLogout} className={`flex items-center gap-3 py-2.5 w-full text-slate-400 dark:text-slate-500 hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}><LogOut size={18} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap text-sm">Cerrar Sesión</span>}</button>
-        </div>
+        {/* ================= PERFIL DE USUARIO UNIFICADO ================= */}
+<div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+  <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+    <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
+      {userData ? getInitials() : '...'}
+    </div>
+    {!isCollapsed && (
+      <div className="overflow-hidden">
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">
+          {userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase()) ? 'ESPECIALISTA' : 'DPTO. HISTORIAS'}
+        </p>
+        <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+          {userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase()) ? 'Dr(a). ' : ''}{userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
+        </p>
+      </div>
+    )}
+  </div>
+  <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+    <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
+  </button>
+</div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
