@@ -4,7 +4,8 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, LogOut, 
   Menu, Sun, Moon, Plus, Search, X, PanelLeft, 
-  Filter, Edit3, Phone, FileDigit, CalendarDays
+  Filter, Edit3, Phone, FileDigit, CalendarDays,
+  CheckCircle, AlertCircle
 } from 'lucide-react';
 
 export default function Pacientes() {
@@ -24,6 +25,7 @@ export default function Pacientes() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
+  
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isModalCrearOpen, setIsModalCrearOpen] = useState(false);
@@ -32,8 +34,18 @@ export default function Pacientes() {
   const [activeTab, setActiveTab] = useState('datos'); 
   const [isEditingData, setIsEditingData] = useState(false); 
   
-  // Nuevo estado para leer las notas clínicas sin alertas feas
+  // Estado para leer las notas clínicas sin alertas feas
   const [notaModal, setNotaModal] = useState({ isOpen: false, html: '' });
+
+  // 🔥 ESTADO PARA LAS NOTIFICACIONES FLOTANTES (TOAST) 🔥
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 4000);
+  };
 
   const [userData, setUserData] = useState(null);
   const [pacientes, setPacientes] = useState([]);
@@ -119,7 +131,13 @@ export default function Pacientes() {
       setPacientes([data[0], ...pacientes]);
       setIsModalCrearOpen(false);
       setFormData({ nombres: '', apellidos: '', cedula: '', telefono: '', correo: '', sexo: '', fecha_nacimiento: '', estado_civil: 'No especificado' });
-    } catch (error) { alert("Hubo un error al crear. Intenta de nuevo."); } finally { setGuardando(false); }
+      
+      showToast("Paciente registrado con éxito", "success");
+    } catch (error) { 
+      showToast("Hubo un error al crear. Intenta de nuevo.", "error"); 
+    } finally { 
+      setGuardando(false); 
+    }
   };
 
   const handleActualizarPaciente = async (e) => {
@@ -137,8 +155,13 @@ export default function Pacientes() {
       const pacienteActualizado = { ...pacienteSeleccionado, ...editFormData };
       setPacienteSeleccionado(pacienteActualizado);
       setIsEditingData(false); 
-      alert("Paciente actualizado con éxito");
-    } catch (error) { alert("Hubo un error al actualizar. Intenta de nuevo."); } finally { setGuardando(false); }
+      
+      showToast("Paciente actualizado con éxito", "success");
+    } catch (error) { 
+      showToast("Hubo un error al actualizar. Intenta de nuevo.", "error"); 
+    } finally { 
+      setGuardando(false); 
+    }
   };
 
   const abrirPerfil = (paciente) => {
@@ -181,7 +204,7 @@ export default function Pacientes() {
   };
 
   const handleWhatsApp = (telefono) => {
-    if (!telefono) return alert("Este paciente no tiene número registrado.");
+    if (!telefono) return showToast("Este paciente no tiene número registrado.", "error");
     let num = telefono.replace(/\D/g, '');
     if (num.startsWith('0')) num = '58' + num.substring(1);
     else if (!num.startsWith('58') && num.length === 10) num = '58' + num;
@@ -199,16 +222,35 @@ export default function Pacientes() {
     <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300">
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />}
 
+      {/* ================= ALERTA FLOTANTE (TOAST) ARRIBA A LA DERECHA ================= */}
+      <div 
+        className={`fixed top-6 right-6 z-[9999] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border transition-all duration-300 transform no-print ${
+          toast.visible ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0 pointer-events-none'
+        } ${
+          toast.type === 'success' 
+            ? 'bg-emerald-50 dark:bg-[#064e3b] border-emerald-200 dark:border-emerald-800' 
+            : 'bg-rose-50 dark:bg-[#4c0519] border-rose-200 dark:border-rose-800'
+        }`}
+      >
+        {toast.type === 'success' 
+          ? <CheckCircle size={24} className="text-emerald-600 dark:text-emerald-400" /> 
+          : <AlertCircle size={24} className="text-rose-600 dark:text-rose-400" />
+        }
+        <span className={`font-bold text-sm ${toast.type === 'success' ? 'text-emerald-800 dark:text-emerald-100' : 'text-rose-800 dark:text-rose-100'}`}>
+          {toast.message}
+        </span>
+      </div>
+
       {/* ================= MODAL DE NOTA CLÍNICA (EVITA EL ALERT FEO) ================= */}
       {notaModal.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
-          <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-[#111111]">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-[#16161a]">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><FileText size={18}/> Evolución Médica</h3>
               <button onClick={() => setNotaModal({isOpen: false, html: ''})} className="text-slate-400 hover:text-rose-500 transition-colors"><X size={20}/></button>
             </div>
             <div className="p-8 overflow-y-auto custom-scrollbar text-slate-800 dark:text-slate-200 text-sm html-viewer" dangerouslySetInnerHTML={{ __html: notaModal.html }} />
-            <div className="p-4 bg-slate-50 dark:bg-[#111111] border-t border-slate-200 dark:border-white/5 flex justify-end">
+            <div className="p-4 bg-slate-50 dark:bg-[#16161a] border-t border-slate-200 dark:border-white/5 flex justify-end">
                <button onClick={() => setNotaModal({isOpen: false, html: ''})} className="px-5 py-2 bg-[#0081a7] text-white rounded-xl font-bold text-sm shadow-md hover:bg-[#006b8a] transition-colors">Cerrar</button>
             </div>
           </div>
@@ -235,27 +277,26 @@ export default function Pacientes() {
             </nav>
           </div>
         </div>
-        {/* ================= PERFIL DE USUARIO UNIFICADO ================= */}
-<div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
-  <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-    <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
-      {userData ? getInitials() : '...'}
-    </div>
-    {!isCollapsed && (
-      <div className="overflow-hidden">
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">
-          {userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase()) ? 'ESPECIALISTA' : 'DPTO. HISTORIAS'}
-        </p>
-        <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
-          {userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase()) ? 'Dr(a). ' : ''}{userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
-        </p>
-      </div>
-    )}
-  </div>
-  <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-    <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
-  </button>
-</div>
+        <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
+          <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
+              {userData ? getInitials() : '...'}
+            </div>
+            {!isCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-tight">
+                  DPTO. HISTORIAS
+                </p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate">
+                  {userData ? `${userData.nombres} ${userData.apellidos}` : 'Cargando...'}
+                </p>
+              </div>
+            )}
+          </div>
+          <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+            <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
+          </button>
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden w-full relative bg-slate-100 dark:bg-[#050505]">
@@ -274,20 +315,26 @@ export default function Pacientes() {
               <div className="bg-white dark:bg-[#111111] rounded-[2rem] shadow-xl overflow-hidden border border-slate-200 dark:border-white/5">
                 <div className="bg-[#0081a7] dark:bg-[#005f7a] px-8 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
-                    <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Pacientes Globales</h2>
-                    <p className="text-cyan-100 text-sm font-medium">Gestiona y accede rápidamente a las historias clínicas de tu consulta.</p>
+                    <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Directorio de Pacientes</h2>
+                    <p className="text-cyan-100 text-sm font-medium">Busca, gestiona y visualiza la información de los pacientes registrados.</p>
                   </div>
-                  
+                  <button onClick={() => setIsModalCrearOpen(true)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5 transition-all w-full md:w-auto">
+                    <Plus size={18} /> Nuevo Paciente
+                  </button>
                 </div>
 
                 <div className="p-8">
                   <div className="mb-6">
-                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 block">Pacientes</label>
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                        <input type="text" placeholder="Buscar paciente por nombre o cédula..." className="w-full pl-11 pr-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:text-white text-sm shadow-sm" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-                      </div>
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 block">Buscar en el directorio</label>
+                    <div className="relative max-w-md">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                      <input 
+                        type="text" 
+                        placeholder="Nombre, apellido o cédula..." 
+                        className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0081a7] text-sm shadow-sm" 
+                        value={busqueda} 
+                        onChange={(e) => setBusqueda(e.target.value)} 
+                      />
                     </div>
                   </div>
 
@@ -298,7 +345,11 @@ export default function Pacientes() {
                       <table className="w-full text-left whitespace-nowrap">
                         <thead>
                           <tr className="border-b border-slate-200 dark:border-white/10 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                            <th className="px-4 py-3">Paciente</th><th className="px-4 py-3">Cédula</th><th className="px-4 py-3 hidden sm:table-cell">Edad</th><th className="px-4 py-3 hidden md:table-cell">Sexo</th><th className="px-4 py-3 text-right">Acciones</th>
+                            <th className="px-4 py-3">Paciente</th>
+                            <th className="px-4 py-3">Cédula</th>
+                            <th className="px-4 py-3 hidden sm:table-cell">Edad</th>
+                            <th className="px-4 py-3 hidden md:table-cell">Sexo</th>
+                            <th className="px-4 py-3 text-right">Acciones</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -311,16 +362,20 @@ export default function Pacientes() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{paciente.cedula || '-'}</td>
-                              <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hidden sm:table-cell">{calcularEdad(paciente.fecha_nacimiento)}</td>
+                              <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hidden sm:table-cell">{calcularEdad(paciente.fecha_nacimiento)} años</td>
                               <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300 hidden md:table-cell">{paciente.sexo || '-'}</td>
                               <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-end gap-2">
-                                  <button onClick={() => { abrirPerfil(paciente); setActiveTab('historias'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 rounded-md text-xs font-bold hover:bg-cyan-100 transition-colors"><FileText size={14} /> Historial</button>
-                                  <button onClick={() => { abrirPerfil(paciente); setIsEditingData(true); }} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"><Edit3 size={14} /> Editar</button>
-                                </div>
+                                <button onClick={() => abrirPerfil(paciente)} className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 rounded-md text-xs font-bold hover:bg-cyan-100 transition-colors ml-auto">
+                                  <FileText size={14} /> Abrir Ficha
+                                </button>
                               </td>
                             </tr>
                           ))}
+                          {pacientesFiltrados.length === 0 && (
+                            <tr>
+                              <td colSpan="5" className="px-4 py-8 text-center text-slate-500">No se encontraron pacientes registrados.</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -330,6 +385,8 @@ export default function Pacientes() {
             </div>
           ) : (
             <div className="w-full animate-[fadeIn_0.3s_ease-out]">
+              
+              {/* CABECERA DEL PACIENTE ESTILO DASHBOARD */}
               <div className="bg-[#0081a7] dark:bg-[#005f7a] text-white pt-8 px-4 md:px-10 shrink-0 shadow-md">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6">
                   <div className="flex items-center gap-5">
@@ -364,7 +421,7 @@ export default function Pacientes() {
                         <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
                           <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5">
                             <h4 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white"><User size={18} className="text-slate-400" /> Detalles del Paciente</h4>
-                            <button onClick={() => setIsEditingData(true)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition-colors"><Edit3 size={14} /> Editar datos</button>
+                            <button onClick={() => setIsEditingData(true)} className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"><Edit3 size={14} /> Editar datos</button>
                           </div>
                           <div className="px-6 py-2 pb-6 grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-10 text-sm">
                             <div className="flex flex-col py-3 border-b border-slate-100 dark:border-white/5"><span className="text-slate-500 font-medium mb-1">Nombre completo</span><span className="font-bold text-slate-900 dark:text-white">{pacienteSeleccionado.nombres} {pacienteSeleccionado.apellidos}</span></div>
@@ -381,18 +438,18 @@ export default function Pacientes() {
                         <div className="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-white/10 pb-4">
                           <h3 className="text-xl font-bold text-slate-900 dark:text-white">Modificar Ficha</h3>
                           <div className="flex gap-2">
-                            <button type="button" onClick={() => setIsEditingData(false)} className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#111111] hover:bg-slate-50">Cancelar</button>
-                            <button type="submit" disabled={guardando} className="px-6 py-2 bg-[#0081a7] text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50">{guardando ? 'Guardando...' : 'Guardar Cambios'}</button>
+                            <button type="button" onClick={() => setIsEditingData(false)} className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#111111] hover:bg-slate-50 dark:hover:bg-white/5">Cancelar</button>
+                            <button type="submit" disabled={guardando} className="px-6 py-2 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl text-xs font-bold shadow-md disabled:opacity-50 transition-colors">{guardando ? 'Guardando...' : 'Guardar Cambios'}</button>
                           </div>
                         </div>
                         <div className="bg-white dark:bg-[#111111] rounded-2xl p-6 border border-slate-200 dark:border-white/5 shadow-sm">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cédula</label><input type="text" name="cedula" value={editFormData.cedula} onChange={(e) => handleInputChange(e, true)} maxLength="12" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500" /></div>
-                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Nombres</label><input type="text" name="nombres" value={editFormData.nombres} onChange={(e) => handleInputChange(e, true)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500" /></div>
-                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Apellidos</label><input type="text" name="apellidos" value={editFormData.apellidos} onChange={(e) => handleInputChange(e, true)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500" /></div>
-                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha nacimiento</label><input type="date" name="fecha_nacimiento" value={editFormData.fecha_nacimiento} onChange={(e) => handleInputChange(e, true)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500 [&::-webkit-calendar-picker-indicator]:dark:invert" /></div>
-                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Sexo</label><select name="sexo" value={editFormData.sexo} onChange={(e) => handleInputChange(e, true)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option><option value="Otro">Otro</option></select></div>
-                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Teléfono</label><input type="text" name="telefono" value={editFormData.telefono} onChange={(e) => handleInputChange(e, true)} maxLength="12" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Cédula</label><input type="text" name="cedula" value={editFormData.cedula} onChange={(e) => handleInputChange(e, true)} maxLength="12" className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Nombres</label><input type="text" name="nombres" value={editFormData.nombres} onChange={(e) => handleInputChange(e, true)} required className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Apellidos</label><input type="text" name="apellidos" value={editFormData.apellidos} onChange={(e) => handleInputChange(e, true)} required className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Fecha nacimiento</label><input type="date" name="fecha_nacimiento" value={editFormData.fecha_nacimiento} onChange={(e) => handleInputChange(e, true)} required className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] [&::-webkit-calendar-picker-indicator]:dark:invert" /></div>
+                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Sexo</label><select name="sexo" value={editFormData.sexo} onChange={(e) => handleInputChange(e, true)} required className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]"><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option><option value="Otro">Otro</option></select></div>
+                            <div><label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Teléfono</label><input type="text" name="telefono" value={editFormData.telefono} onChange={(e) => handleInputChange(e, true)} maxLength="12" className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
                           </div>
                         </div>
                       </form>
@@ -400,33 +457,50 @@ export default function Pacientes() {
                   </>
                 )}
 
+                {/* ================= TAB 2: CONSULTAS ANTERIORES (ESTILO OSCURO/MINIMALISTA) ================= */}
                 {activeTab === 'historias' && (
                   <div className="animate-[fadeIn_0.2s_ease-out]">
-                    <div className="bg-white dark:bg-[#111111] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
+                    <div className="bg-[#111111] dark:bg-[#0a0a0a] rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-xl">
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                          <thead className="bg-slate-50 dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-white/5">
-                            <tr className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                              <th className="px-4 py-3">Fecha</th>
-                              <th className="px-4 py-3">Motivo</th>
-                              <th className="px-4 py-3">Estado</th>
-                              <th className="px-4 py-3 text-right">Acciones</th>
+                        <table className="w-full text-left whitespace-nowrap">
+                          <thead className="bg-[#f8fafc] dark:bg-[#16161a] border-b border-slate-200 dark:border-white/5">
+                            <tr className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                              <th className="px-6 py-4">Fecha</th>
+                              <th className="px-6 py-4">Motivo</th>
+                              <th className="px-6 py-4">Estado</th>
+                              <th className="px-6 py-4 text-right">Acciones</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                             {consultasPaciente.map((consulta) => (
-                              <tr key={consulta.id} className="hover:bg-slate-50 dark:hover:bg-[#1a1a1a] transition-colors">
-                                <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-200">{formatearFechaTextoCompleta(consulta.fecha_consulta)}</td>
-                                <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{consulta.motivo || 'Evolutiva'}</td>
-                                <td className="px-4 py-3"><span className="inline-block bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full text-xs font-bold">{consulta.estado || 'Completada'}</span></td>
-                                <td className="px-4 py-3 text-right">
-                                  {/* Aquí se activa el modal para ver la nota sin la alerta */}
-                                  <button onClick={() => setNotaModal({isOpen: true, html: consulta.nota_clinica || 'Sin notas.'})} className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-800 dark:hover:text-cyan-300 text-xs font-bold transition-colors">Ver nota</button>
+                              <tr key={consulta.id} className="hover:bg-slate-50 dark:hover:bg-[#16161a] transition-colors">
+                                <td className="px-6 py-4 text-sm font-medium text-slate-800 dark:text-slate-200">
+                                  {formatearFechaTextoCompleta(consulta.fecha_consulta)}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
+                                  {consulta.motivo || 'Ingreso Forma 15-108'}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="inline-block bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-500 border border-emerald-200 dark:border-emerald-800/30 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider">
+                                    {consulta.estado || 'Finalizada'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button 
+                                    onClick={() => setNotaModal({isOpen: true, html: consulta.nota_clinica || 'Sin notas.'})}
+                                    className="text-[#0081a7] dark:text-cyan-500 hover:text-[#005f7a] dark:hover:text-cyan-400 font-bold text-xs transition-colors"
+                                  >
+                                    Ver nota
+                                  </button>
                                 </td>
                               </tr>
                             ))}
                             {consultasPaciente.length === 0 && (
-                              <tr><td colSpan="4" className="px-4 py-8 text-center text-slate-500">No hay consultas registradas.</td></tr>
+                              <tr>
+                                <td colSpan="4" className="px-6 py-8 text-center text-slate-500 text-sm">
+                                  Este paciente no tiene consultas previas registradas.
+                                </td>
+                              </tr>
                             )}
                           </tbody>
                         </table>
@@ -434,12 +508,14 @@ export default function Pacientes() {
                     </div>
                   </div>
                 )}
+
               </div>
             </div>
           )}
         </div>
       </main>
 
+      {/* MODAL CREAR PACIENTE */}
       {isModalCrearOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white dark:bg-[#111111] w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col max-h-[90vh]">
@@ -450,18 +526,18 @@ export default function Pacientes() {
             <div className="p-6 overflow-y-auto custom-scrollbar bg-slate-50/50 dark:bg-[#0a0a0a]/50">
               <form id="formPacienteN" onSubmit={handleGuardarPaciente} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div><label className="block text-xs font-bold mb-1.5">Cédula</label><input type="text" name="cedula" value={formData.cedula} onChange={(e) => handleInputChange(e, false)} maxLength="12" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg" required /></div>
-                  <div><label className="block text-xs font-bold mb-1.5">Nombres *</label><input type="text" name="nombres" value={formData.nombres} onChange={(e) => handleInputChange(e, false)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg" /></div>
-                  <div><label className="block text-xs font-bold mb-1.5">Apellidos *</label><input type="text" name="apellidos" value={formData.apellidos} onChange={(e) => handleInputChange(e, false)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg" /></div>
-                  <div><label className="block text-xs font-bold mb-1.5">Fecha nacimiento *</label><input type="date" name="fecha_nacimiento" value={formData.fecha_nacimiento} onChange={(e) => handleInputChange(e, false)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg [&::-webkit-calendar-picker-indicator]:dark:invert" /></div>
-                  <div><label className="block text-xs font-bold mb-1.5">Sexo *</label><select name="sexo" value={formData.sexo} onChange={(e) => handleInputChange(e, false)} required className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg"><option value="">Seleccione...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option></select></div>
-                  <div><label className="block text-xs font-bold mb-1.5">Teléfono</label><input type="text" name="telefono" value={formData.telefono} onChange={(e) => handleInputChange(e, false)} maxLength="12" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg" /></div>
+                  <div><label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Cédula</label><input type="text" name="cedula" value={formData.cedula} onChange={(e) => handleInputChange(e, false)} maxLength="12" className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" required /></div>
+                  <div><label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Nombres *</label><input type="text" name="nombres" value={formData.nombres} onChange={(e) => handleInputChange(e, false)} required className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
+                  <div><label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Apellidos *</label><input type="text" name="apellidos" value={formData.apellidos} onChange={(e) => handleInputChange(e, false)} required className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
+                  <div><label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Fecha nacimiento *</label><input type="date" name="fecha_nacimiento" value={formData.fecha_nacimiento} onChange={(e) => handleInputChange(e, false)} required className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] [&::-webkit-calendar-picker-indicator]:dark:invert" /></div>
+                  <div><label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Sexo *</label><select name="sexo" value={formData.sexo} onChange={(e) => handleInputChange(e, false)} required className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]"><option value="">Seleccione...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option></select></div>
+                  <div><label className="block text-xs font-bold mb-1.5 text-slate-700 dark:text-slate-300">Teléfono</label><input type="text" name="telefono" value={formData.telefono} onChange={(e) => handleInputChange(e, false)} maxLength="12" className="w-full px-4 py-3 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7]" /></div>
                 </div>
               </form>
             </div>
-            <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end bg-white dark:bg-[#0B0D12] rounded-b-2xl">
-              <button type="button" onClick={() => setIsModalCrearOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300">Cancelar</button>
-              <button type="submit" form="formPacienteN" disabled={guardando} className="bg-[#0081a7] text-white px-6 py-2.5 rounded-xl font-bold">{guardando ? 'Guardando...' : 'Guardar Paciente'}</button>
+            <div className="p-6 border-t border-slate-200 dark:border-white/5 flex gap-3 justify-end bg-slate-50 dark:bg-[#111111] rounded-b-2xl">
+              <button type="button" onClick={() => setIsModalCrearOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-colors text-sm">Cancelar</button>
+              <button type="submit" form="formPacienteN" disabled={guardando} className="bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-2.5 rounded-xl font-bold shadow-md transition-colors text-sm disabled:opacity-50">{guardando ? 'Guardando...' : 'Guardar Paciente'}</button>
             </div>
           </div>
         </div>

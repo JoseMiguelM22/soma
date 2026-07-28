@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom'; // <--- AÑADIDO useLocation
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, User, LogOut, 
-  Menu, Sun, Moon, Plus, Search, X, PanelLeft, ClipboardList, 
-  Check, Maximize, Filter, ArrowLeft, Edit3, Eye, Send, Download, FlaskConical, ShieldCheck
+  Menu, Sun, Moon, Plus, Search, X, PanelLeft, 
+  Maximize, ArrowLeft, Edit3, Eye, Send, Download, ShieldCheck,
+  CheckCircle, AlertCircle, Check
 } from 'lucide-react';
-import { jsPDF } from "jspdf";
 
 import Parte1 from './Parte1';
 import Parte2 from './Parte2';
@@ -14,7 +14,7 @@ import Parte3 from './Parte3';
 
 export default function Historias() {
   const navigate = useNavigate();
-  const location = useLocation(); // <--- AÑADIDO: Para leer la redirección mágica
+  const location = useLocation(); 
   
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -52,12 +52,16 @@ export default function Historias() {
   const [busqueda, setBusqueda] = useState('');
   const [guardando, setGuardando] = useState(false);
 
-  const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
-  const [isConstanciaModalOpen, setIsConstanciaModalOpen] = useState(false);
-  const [textoRecipe, setTextoRecipe] = useState('');
-  const [textoIndicaciones, setTextoIndicaciones] = useState('');
-  const [textoInforme, setTextoInforme] = useState('');
-  
+  // 🔥 ESTADO PARA LAS NOTIFICACIONES FLOTANTES (TOAST) 🔥
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ visible: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 4000);
+  };
+
   const [historiaData, setHistoriaData] = useState({
     id: null, id_paciente: '', fecha_consulta: new Date().toISOString().slice(0, 16), proxima_consulta: '', consultorio: ''
   });
@@ -118,7 +122,6 @@ export default function Historias() {
 
   useEffect(() => { fetchData(); }, [navigate]);
 
-  // 🔥 NUEVO: EFECTO QUE RECIBE LA REDIRECCIÓN Y ABRE AUTOMÁTICAMENTE EL MODAL 🔥
   useEffect(() => {
     if (location.state?.autoOpenConsulta && !loading) {
       const c = location.state.autoOpenConsulta;
@@ -126,11 +129,8 @@ export default function Historias() {
       
       if (pac) {
         setPacienteSeleccionado(pac);
-        // Pequeño retraso para asegurar que React actualice el estado
         setTimeout(() => abrirEditorHistoria(c, pac.id), 100);
       }
-      
-      // Limpiamos el state para que no se vuelva a abrir si el usuario recarga la página
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, loading, navigate, location.pathname]);
@@ -228,17 +228,26 @@ export default function Historias() {
       if (error) throw error;
       await fetchData(); 
 
-      // Mantenemos el modal abierto si acabamos de guardar
-      if (dataToOpen) {
-        const pac = Array.isArray(dataToOpen.pacientes) ? dataToOpen.pacientes[0] : dataToOpen.pacientes;
-        if (pac && !pacienteSeleccionado) {
-          setPacienteSeleccionado(pac);
+      showToast(esEspecialista ? "¡Cambios guardados y consulta completada!" : "¡Formato guardado exitosamente!", "success");
+
+      // 🔥 LÓGICA DE REDIRECCIÓN A INICIO PARA EL ESPECIALISTA 🔥
+      if (esEspecialista) {
+        setTimeout(() => {
+          navigate('/dashboard'); 
+        }, 1500); 
+      } else {
+        if (dataToOpen) {
+          const pac = Array.isArray(dataToOpen.pacientes) ? dataToOpen.pacientes[0] : dataToOpen.pacientes;
+          if (pac && !pacienteSeleccionado) {
+            setPacienteSeleccionado(pac);
+          }
+          abrirEditorHistoria(dataToOpen, pac ? pac.id : historiaData.id_paciente);
         }
-        abrirEditorHistoria(dataToOpen, pac ? pac.id : historiaData.id_paciente);
       }
 
-      alert(esEspecialista ? "¡Cambios del especialista guardados y consulta completada!" : "¡Formato guardado exitosamente!");
-    } catch (error) { alert("Error al guardar: " + error.message); } finally { setGuardando(false); }
+    } catch (error) { 
+      showToast("Error al guardar: " + error.message, "error"); 
+    } finally { setGuardando(false); }
   };
 
   const handleConfirmarRemision = async () => {
@@ -246,72 +255,19 @@ export default function Historias() {
     try {
       const { error } = await supabase.from('consultas').update({ id_medico: especialistaSelect, estado: 'En Espera' }).eq('id', historiaData.id);
       if (error) throw error;
-      alert("¡Historia remitida correctamente!"); 
+      
       setIsRemitirModalOpen(false); 
       setEspecialistaSelect(""); 
       setBusquedaEspecialista(""); 
       fetchData(); 
-    } catch (error) { alert("Error al remitir."); } finally { setGuardando(false); }
+
+      showToast("¡Historia remitida al especialista correctamente!", "success");
+    } catch (error) { 
+      showToast("Error al remitir la historia.", "error"); 
+    } finally { setGuardando(false); }
   };
 
   const handleImprimirPDF = () => window.print();
-
-  const generarPDF = (tipo) => {
-    if (tipo === 'recipe' && !textoRecipe.trim() && !textoIndicaciones.trim()) return alert("Debes escribir algo en el récipe.");
-    if (tipo === 'constancia' && !textoInforme.trim()) return alert("Debes escribir el contenido de la constancia.");
-
-    const doc = new jsPDF();
-    const img = new Image();
-    img.src = '/soma_logo.png'; 
-
-    img.onload = () => {
-      doc.addImage(img, 'PNG', 20, 15, 35, 10);
-      dibujarContenidoPDF(doc, tipo);
-    };
-    
-    img.onerror = () => {
-      doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(0, 129, 167);
-      doc.text("SOMA", 20, 22);
-      dibujarContenidoPDF(doc, tipo);
-    };
-  };
-
-  const dibujarContenidoPDF = (doc, tipo) => {
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(30, 30, 30);
-    doc.text(tipo === 'recipe' ? 'RÉCIPE E INDICACIONES' : 'CONSTANCIA MÉDICA', 105, 30, { align: "center" });
-    
-    doc.setLineWidth(0.5); doc.setDrawColor(200, 200, 200); doc.line(20, 38, 190, 38);
-    
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(100, 100, 100);
-    doc.text(`Médico: Dr(a). ${userData?.nombres || ''} ${userData?.apellidos || ''}`, 20, 48);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 150, 48);
-    
-    doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30); doc.text("Datos del Paciente", 20, 60);
-    doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
-    doc.text(`Nombre: ${pacienteSeleccionado?.nombres || ''} ${pacienteSeleccionado?.apellidos || ''}`, 20, 68);
-    doc.text(`C.I: ${pacienteSeleccionado?.cedula || 'N/A'}`, 150, 68);
-    doc.line(20, 75, 190, 75);
-
-    let currentY = 85;
-    
-    if (tipo === 'recipe') {
-      const colWidth = 80; const startXLeft = 20; const startXRight = 110; 
-      doc.setFont("helvetica", "bold"); doc.setTextColor(30, 30, 30);
-      doc.text("Medicación:", startXLeft, currentY); 
-      doc.text("Indicaciones al paciente:", startXRight, currentY); 
-      currentY += 7;
-      doc.setFont("helvetica", "normal"); doc.setTextColor(80, 80, 80);
-      doc.text(doc.splitTextToSize(textoRecipe, colWidth), startXLeft, currentY);
-      doc.text(doc.splitTextToSize(textoIndicaciones, colWidth), startXRight, currentY);
-      doc.save(`Recipe_${pacienteSeleccionado?.nombres || 'Paciente'}.pdf`);
-      setIsRecipeModalOpen(false); setTextoRecipe(''); setTextoIndicaciones('');
-    } else {
-      doc.setFont("helvetica", "normal"); doc.setTextColor(50, 50, 50);
-      doc.text(doc.splitTextToSize(textoInforme, 170), 20, currentY);
-      doc.save(`Constancia_${pacienteSeleccionado?.nombres || 'Paciente'}.pdf`);
-      setIsConstanciaModalOpen(false); setTextoInforme('');
-    }
-  };
 
   const agrupadasFiltradas = historiasAgrupadas.filter(item => {
     const term = busqueda.toLowerCase();
@@ -330,6 +286,25 @@ export default function Historias() {
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#0B0D12] text-slate-800 dark:text-slate-200 font-sans overflow-hidden transition-colors duration-300 antialiased tracking-normal">
       {isSidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity no-print" onClick={() => setIsSidebarOpen(false)} />}
+
+      {/* ================= ALERTA FLOTANTE (TOAST) ARRIBA A LA DERECHA ================= */}
+      <div 
+        className={`fixed top-6 right-6 z-[9999] flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border transition-all duration-300 transform no-print ${
+          toast.visible ? 'translate-y-0 opacity-100' : '-translate-y-10 opacity-0 pointer-events-none'
+        } ${
+          toast.type === 'success' 
+            ? 'bg-emerald-50 dark:bg-[#064e3b] border-emerald-200 dark:border-emerald-800' 
+            : 'bg-rose-50 dark:bg-[#4c0519] border-rose-200 dark:border-rose-800'
+        }`}
+      >
+        {toast.type === 'success' 
+          ? <CheckCircle size={24} className="text-emerald-600 dark:text-emerald-400" /> 
+          : <AlertCircle size={24} className="text-rose-600 dark:text-rose-400" />
+        }
+        <span className={`font-bold text-sm ${toast.type === 'success' ? 'text-emerald-800 dark:text-emerald-100' : 'text-rose-800 dark:text-rose-100'}`}>
+          {toast.message}
+        </span>
+      </div>
 
       {/* MODAL REMITIR ESPECIALISTA */}
       {isRemitirModalOpen && !esEspecialista && (
@@ -408,33 +383,6 @@ export default function Historias() {
         </div>
       )}
 
-      {/* MODAL REDACTAR RÉCIPE */}
-      {isRecipeModalOpen && esEspecialista && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-          <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
-            <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2"><FlaskConical size={20}/> Emitir Récipe Médico</h3><button onClick={() => setIsRecipeModalOpen(false)} className="text-slate-400 hover:text-rose-500"><X size={20}/></button></div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-[#0a0a0a]">
-              <div><label className="block text-sm font-bold mb-2">Medicación</label><textarea rows="10" placeholder="Ej. Acetaminofen 500mg..." value={textoRecipe} onChange={(e) => setTextoRecipe(e.target.value)} className="w-full p-4 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-xl outline-none custom-scrollbar" /></div>
-              <div><label className="block text-sm font-bold mb-2">Indicaciones</label><textarea rows="10" placeholder="Ej. Tomar 1 tableta cada 8 horas..." value={textoIndicaciones} onChange={(e) => setTextoIndicaciones(e.target.value)} className="w-full p-4 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-xl outline-none custom-scrollbar" /></div>
-            </div>
-            <div className="p-5 border-t border-slate-200 dark:border-white/5 flex justify-end gap-3 bg-white dark:bg-[#111111]"><button onClick={() => setIsRecipeModalOpen(false)} className="px-5 py-2 font-bold">Cancelar</button><button onClick={() => generarPDF('recipe')} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-2"><Download size={16}/> Generar PDF</button></div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL REDACTAR CONSTANCIA */}
-      {isConstanciaModalOpen && esEspecialista && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-          <div className="bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
-            <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center"><h3 className="text-lg font-bold flex items-center gap-2"><FileText size={20}/> Emitir Constancia</h3><button onClick={() => setIsConstanciaModalOpen(false)} className="text-slate-400 hover:text-rose-500"><X size={20}/></button></div>
-            <div className="p-6 bg-slate-50 dark:bg-[#0a0a0a]">
-              <label className="block text-sm font-bold mb-2">Contenido del Informe / Constancia</label><textarea rows="12" placeholder="Por medio de la presente hago constar..." value={textoInforme} onChange={(e) => setTextoInforme(e.target.value)} className="w-full p-5 bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-xl outline-none custom-scrollbar leading-relaxed" />
-            </div>
-            <div className="p-5 border-t border-slate-200 dark:border-white/5 flex justify-end gap-3 bg-white dark:bg-[#111111]"><button onClick={() => setIsConstanciaModalOpen(false)} className="px-5 py-2 font-bold">Cancelar</button><button onClick={() => generarPDF('constancia')} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-2"><Download size={16}/> Generar PDF</button></div>
-          </div>
-        </div>
-      )}
-
       <aside className={`no-print fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#16161a] border-r border-slate-200/80 dark:border-white/[0.04] flex flex-col justify-between transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 md:m-4 md:mr-0 md:rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} ${isCollapsed ? 'md:w-24' : 'md:w-68'}`}>
         <div>
           <div className={`h-20 flex items-center transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}><Link to={esEspecialista ? "/dashboard" : "/admision"} className="flex items-center overflow-hidden whitespace-nowrap">{isCollapsed ? <span className="text-emerald-500 text-3xl mb-1 font-black">*</span> : <><img src="/soma_logo.png" alt="SOMA Logo" className="h-6 object-contain block dark:hidden" /><img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-6 object-contain hidden dark:block" /></>}</Link>{!isCollapsed && <button className="md:hidden text-slate-400 hover:text-rose-500 transition-colors" onClick={() => setIsSidebarOpen(false)}><X size={20} /></button>}</div>
@@ -449,6 +397,7 @@ export default function Historias() {
           </div>
         </div>
         
+        {/* ================= PERFIL DE USUARIO UNIFICADO ================= */}
         <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
             <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
@@ -517,12 +466,6 @@ export default function Historias() {
                   <div className="flex flex-wrap items-center gap-3">
                     {!esEspecialista && (
                       <button onClick={() => abrirEditorHistoria(null, pacienteSeleccionado.id)} className="bg-white text-[#0081a7] hover:bg-slate-50 px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><Plus size={18} /> Nuevo Formato 15-108</button>
-                    )}
-                    {esEspecialista && (
-                      <>
-                        <button onClick={() => setIsRecipeModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><FlaskConical size={18} /> Redactar Récipe</button>
-                        <button onClick={() => setIsConstanciaModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 transform hover:-translate-y-0.5"><FileText size={18} /> Emitir Constancia</button>
-                      </>
                     )}
                   </div>
                 </div>
