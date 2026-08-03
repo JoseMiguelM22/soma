@@ -34,7 +34,7 @@ export default function Pacientes() {
   const [activeTab, setActiveTab] = useState('datos'); 
   const [isEditingData, setIsEditingData] = useState(false); 
   
-  // Estado para leer las notas clínicas sin alertas feas
+  // Estado para leer las notas clínicas
   const [notaModal, setNotaModal] = useState({ isOpen: false, html: '' });
 
   // 🔥 ESTADO PARA LAS NOTIFICACIONES FLOTANTES (TOAST) 🔥
@@ -64,11 +64,6 @@ export default function Pacientes() {
     correo: '', sexo: '', fecha_nacimiento: '', estado_civil: 'No especificado'
   });
 
-  useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDarkMode]);
-
   const fetchData = async () => {
     setLoadingPacientes(true);
     try {
@@ -78,11 +73,21 @@ export default function Pacientes() {
       const { data: dbUser, error: userError } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
       if (userError || !dbUser) return navigate('/login');
 
+      // 🔥 PROTECCIÓN EN TIEMPO REAL 🔥
+      // Si el directivo lo suspende o rechaza mientras está adentro, lo expulsa al Login
+      if (dbUser.estado_cuenta === 'Pendiente' || dbUser.estado_cuenta === 'Rechazada') {
+        await supabase.auth.signOut();
+        return navigate('/login');
+      }
+
       const rolUsuario = (dbUser.rol || '').toLowerCase();
 
-      // Bloqueamos a los médicos, esta área es de asistentes
+      // Bloqueamos a los médicos y directivos, esta área es de asistentes
       if (rolUsuario === 'especialista' || rolUsuario === 'medico' || rolUsuario === 'médico') {
         return navigate('/dashboard'); 
+      }
+      if (rolUsuario === 'directivo') {
+        return navigate('/directiva'); 
       }
 
       setUserData(dbUser);
@@ -241,7 +246,7 @@ export default function Pacientes() {
         </span>
       </div>
 
-      {/* ================= MODAL DE NOTA CLÍNICA (EVITA EL ALERT FEO) ================= */}
+      {/* ================= MODAL DE NOTA CLÍNICA ================= */}
       {notaModal.isOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">

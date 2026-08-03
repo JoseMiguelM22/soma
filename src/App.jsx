@@ -10,6 +10,7 @@ import Agendas from './pages/Agendas';
 import Estadisticas from './pages/Estadisticas';
 import Perfil from './pages/Perfil';
 import DashboardAdmision from './pages/DashboardAdmision';
+import Directiva from './pages/Directiva'; // Ajusta la ruta de tu archivo
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
       <Route path="/estadisticas" element={<Estadisticas />} />
       <Route path="/perfil" element={<Perfil />} />
       <Route path="/admision" element={<DashboardAdmision />} />
+      <Route path="/directiva" element={<Directiva />} />
      
     </Routes>
   )

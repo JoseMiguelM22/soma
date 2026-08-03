@@ -538,6 +538,27 @@ export default function Historias() {
           )}
 
         </div>
+          {/* ================= PANTALLA DE BLOQUEO (CUENTA PENDIENTE) ================= */}
+{userData?.estado_cuenta === 'Pendiente' && (
+  <div className="absolute inset-0 z-[9000] bg-slate-100/60 dark:bg-[#050505]/70 backdrop-blur-md flex items-center justify-center p-4">
+    <div className="bg-white dark:bg-[#111111] p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-slate-200 dark:border-white/10 animate-[fadeIn_0.3s_ease-out]">
+      <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-amber-50 dark:border-amber-900/10">
+        {/* Asegúrate de tener importado el ícono Lock de lucide-react en el archivo */}
+        <Lock size={36} />
+      </div>
+      <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Cuenta en Revisión</h2>
+      <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
+        Has iniciado sesión correctamente, pero tus funciones están bloqueadas de forma temporal. La directiva debe verificar tus credenciales y aprobar tu cuenta para que puedas interactuar con el sistema.
+      </p>
+      <button 
+        onClick={handleLogout} 
+        className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 py-3 rounded-xl font-bold transition-colors"
+      >
+        Cerrar Sesión
+      </button>
+    </div>
+  </div>
+)}
       </main>
 
       <style>{`

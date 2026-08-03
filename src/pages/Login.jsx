@@ -53,7 +53,7 @@ export default function Login() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Función unificada con lógica de Roles
+  // Función unificada con lógica de Roles y Validación de Estado
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -80,35 +80,53 @@ export default function Login() {
         });
         if (error) throw error;
 
-        // 2. Buscar el rol en BD
+        // 2. Buscar el rol y ESTADO DE CUENTA en BD
         const { data: dbUser, error: userError } = await supabase
           .from('usuarios')
-          .select('rol')
+          .select('rol, estado_cuenta') // <-- AQUÍ PEDIMOS EL ESTADO
           .eq('id_auth', data.user.id)
           .single();
 
         if (userError) throw userError;
 
-        // 3. Validar Seguridad de Roles
-        if (dbUser.rol !== rolSeleccionado) {
-          await supabase.auth.signOut(); // Destruimos sesión si miente
-          throw new Error(`Acceso denegado: Tu cuenta no es de ${rolSeleccionado === 'especialista' ? 'Médico Especialista' : 'Asistente (Admisión)'}.`);
+        // 🔥 3. VALIDACIÓN DE CREDENCIALES (EL CADENERO) 🔥
+        if (dbUser.estado_cuenta === 'Pendiente') {
+          await supabase.auth.signOut(); // Lo sacamos de una vez
+          throw new Error('Tu cuenta está en revisión. Un directivo debe validar tus credenciales.');
         }
 
-        // 4. Éxito y redirección según rol
+        if (dbUser.estado_cuenta === 'Rechazada') {
+          await supabase.auth.signOut();
+          throw new Error('Tu solicitud de acceso ha sido denegada por la directiva.');
+        }
+
+        // 4. Validar Seguridad de Roles
+        if (dbUser.rol !== rolSeleccionado) {
+          await supabase.auth.signOut(); // Destruimos sesión si miente
+          throw new Error(`Acceso denegado: Tu cuenta no es de ${rolSeleccionado === 'especialista' ? 'Médico Especialista' : (rolSeleccionado === 'departamento' ? 'Asistente (Admisión)' : 'Directivo')}.`);
+        }
+
+        // 5. Éxito y redirección según rol
         setAlert({ show: true, type: 'success', message: '¡Bienvenido de vuelta a SOMA!' });
         
-        if (dbUser.rol === 'departamento') {
+        if (dbUser.rol === 'directivo') {
+          setTimeout(() => navigate('/directiva'), 1000);
+        } else if (dbUser.rol === 'departamento') {
           setTimeout(() => navigate('/admision'), 1000);
         } else {
           setTimeout(() => navigate('/dashboard'), 1000);
         }
 
       } catch (error) {
+        // Verificamos si el error es uno de los nuestros o si es contraseña incorrecta
+        const isCustomError = error.message.includes('Acceso denegado') || 
+                              error.message.includes('Tu cuenta está en revisión') || 
+                              error.message.includes('Tu solicitud de acceso');
+                              
         setAlert({ 
           show: true, 
           type: 'error', 
-          message: error.message.includes('Acceso denegado') ? error.message : 'Credenciales incorrectas. Verifica tu correo y contraseña.' 
+          message: isCustomError ? error.message : 'Credenciales incorrectas. Verifica tu correo y contraseña.' 
         });
       } finally {
         setLoading(false);
@@ -223,7 +241,7 @@ export default function Login() {
             className="space-y-5"
           >
 
-            {/* 1. DESPLEGABLE DE ROL (NUEVO) */}
+            {/* 1. DESPLEGABLE DE ROL */}
             {!isResettingPassword && (
               <div>
                 <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
@@ -256,6 +274,8 @@ export default function Login() {
                   >
                     <option value="especialista">Médico Especialista</option>
                     <option value="departamento">Asistente (Depto. Historias Clinicas)</option>
+                    {/* Agregado el rol Directivo para que puedan loguearse */}
+                    <option value="directivo">Directivo / Administrador</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
                     <ChevronDown size={18} />
