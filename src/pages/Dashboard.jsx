@@ -125,9 +125,19 @@ export default function Dashboard() {
       </div>
     )}
   </div>
-  <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+  <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col gap-2 ${isCollapsed ? 'items-center' : ''}`}>
+  
+  {/* NUEVO BOTÓN DE PERFIL */}
+  <Link to="/perfil" className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-[#0081a7] hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+    <User size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Mi Perfil</span>}
+  </Link>
+
+  {/* TU BOTÓN DE CERRAR SESIÓN (Ya lo tienes) */}
+  <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
     <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
   </button>
+
+</div>
 </div>
       </aside>
 

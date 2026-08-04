@@ -61,7 +61,8 @@ export default function Login() {
     if (isResettingPassword) {
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.correo, {
-          redirectTo: window.location.origin + '/actualizar-contrasena',
+          // Asegúrate de tener la vista de ActualizarContrasena en esta ruta
+          redirectTo: window.location.origin + '/actualizar-contrasena', 
         });
         if (error) throw error;
         setAlert({ show: true, type: 'success', message: 'Te enviamos un enlace al correo para recuperar tu contraseña.' });
@@ -83,15 +84,15 @@ export default function Login() {
         // 2. Buscar el rol y ESTADO DE CUENTA en BD
         const { data: dbUser, error: userError } = await supabase
           .from('usuarios')
-          .select('rol, estado_cuenta') // <-- AQUÍ PEDIMOS EL ESTADO
+          .select('rol, estado_cuenta')
           .eq('id_auth', data.user.id)
           .single();
 
         if (userError) throw userError;
 
-        // 🔥 3. VALIDACIÓN DE CREDENCIALES (EL CADENERO) 🔥
+        // 3. VALIDACIÓN DE CREDENCIALES (EL CADENERO)
         if (dbUser.estado_cuenta === 'Pendiente') {
-          await supabase.auth.signOut(); // Lo sacamos de una vez
+          await supabase.auth.signOut();
           throw new Error('Tu cuenta está en revisión. Un directivo debe validar tus credenciales.');
         }
 
@@ -102,7 +103,7 @@ export default function Login() {
 
         // 4. Validar Seguridad de Roles
         if (dbUser.rol !== rolSeleccionado) {
-          await supabase.auth.signOut(); // Destruimos sesión si miente
+          await supabase.auth.signOut();
           throw new Error(`Acceso denegado: Tu cuenta no es de ${rolSeleccionado === 'especialista' ? 'Médico Especialista' : (rolSeleccionado === 'departamento' ? 'Asistente (Admisión)' : 'Directivo')}.`);
         }
 
@@ -118,7 +119,6 @@ export default function Login() {
         }
 
       } catch (error) {
-        // Verificamos si el error es uno de los nuestros o si es contraseña incorrecta
         const isCustomError = error.message.includes('Acceso denegado') || 
                               error.message.includes('Tu cuenta está en revisión') || 
                               error.message.includes('Tu solicitud de acceso');
@@ -155,24 +155,18 @@ export default function Login() {
     </div>
   )}
 
-  {/* Contenedor principal ensanchado a 1536px para permitir mayor separación */}
   <div className="max-w-[1536px] mx-auto min-h-screen px-8 lg:px-16 py-12 flex items-center justify-center">
 
-    {/* Uso de Flexbox con justify-between para empujar los paneles a los extremos */}
     <div className="flex flex-col lg:flex-row items-center justify-between w-full gap-12 lg:gap-20 xl:gap-32">
 
       {/* PANEL IZQUIERDO */}
-      {/* Alineado hacia la izquierda */}
       <div className="hidden lg:flex justify-start items-center w-full lg:w-1/2 h-full">
-
         <div className="relative">
-
           <img
             src="/soma_logo.png"
             alt="SOMA"
             className="absolute top-8 left-8 h-8 z-20"
           />
-
           <div
             className="
             w-[500px]
@@ -187,61 +181,43 @@ export default function Login() {
           >
             {/* Fondo */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#D8FFF4] via-[#9BF3DB] to-[#17C79A]" />
-
-            {/* Blur grande */}
+            {/* Blurs */}
             <div className="absolute left-[-60px] top-[120px] w-[360px] h-[360px] rounded-full bg-white/40 blur-[120px]" />
-
-            {/* Blur lateral */}
             <div className="absolute right-[-80px] top-[40px] w-[300px] h-[300px] rounded-full bg-[#00FFB3]/20 blur-[110px]" />
-
-            {/* Blur inferior */}
             <div className="absolute bottom-[-80px] left-[140px] w-[250px] h-[250px] rounded-full bg-white/20 blur-[90px]" />
-
             {/* Textura */}
             <div className="absolute inset-0 opacity-[0.05] bg-[radial-gradient(circle,black_1px,transparent_1px)] bg-[length:8px_8px]" />
-
           </div>
-
         </div>
-
       </div>
 
       {/* LOGIN */}
-      {/* Alineado hacia la derecha */}
       <div className="w-full lg:w-1/2 flex justify-end items-center">
         <div className="w-full max-w-[400px]">
 
-          {/* Logo móvil */}
+          {/* Logo móvil e imagen */}
           <div className="lg:hidden flex justify-center mb-10">
-                  {/* Modo Oscuro (Logo Blanco) */}
-                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-15 object-contain dark:block transition-opacity duration-300" />
+            <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-15 object-contain dark:block transition-opacity duration-300" />
           </div>
-
-          {/* Logo escritorio */}
           <div className="hidden lg:block text-center">
-                  {/* Modo Oscuro (Logo Blanco) */}
-                  <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-11 mx-auto mb-8 object-contain dark:block transition-opacity duration-300" />
+            <img src="/soma_logo_blanco.png" alt="SOMA Logo" className="h-11 mx-auto mb-8 object-contain dark:block transition-opacity duration-300" />
           </div>
 
+          {/* Títulos dinámicos dependiendo de si está reseteando o no */}
           <div className="text-center mb-10">
-
-            <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight">
-              Iniciar Sesión
+            <h1 className="text-4xl font-extrabold text-white mb-3 tracking-tight animate-[fadeIn_0.3s_ease-out]">
+              {isResettingPassword ? 'Recuperar Clave' : 'Iniciar Sesión'}
             </h1>
-
-            <p className="text-[#A1A1AA] text-sm font-semibold leading-relaxed max-w-[310px] mx-auto">
-              Accede a tu cuenta para continuar gestionando tus pacientes
-              y consultas.
+            <p className="text-[#A1A1AA] text-sm font-semibold leading-relaxed max-w-[310px] mx-auto animate-[fadeIn_0.3s_ease-out]">
+              {isResettingPassword 
+                ? 'Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.' 
+                : 'Accede a tu cuenta para continuar gestionando tus pacientes y consultas.'}
             </p>
-
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5"
-          >
+          <form onSubmit={handleSubmit} className="space-y-5 animate-[fadeIn_0.3s_ease-out]">
 
-            {/* 1. DESPLEGABLE DE ROL */}
+            {/* 1. DESPLEGABLE DE ROL (Solo se muestra si NO está recuperando clave) */}
             {!isResettingPassword && (
               <div>
                 <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
@@ -251,30 +227,10 @@ export default function Login() {
                   <select
                     value={rolSeleccionado}
                     onChange={(e) => setRolSeleccionado(e.target.value)}
-                    className="
-                      w-full
-                      py-3
-                      px-4
-                      rounded-xl
-                      bg-white
-                      text-sm
-                      font-bold
-                      text-gray-900
-                      outline-none
-                      border
-                      border-transparent
-                      focus:border-[#8B5CF6]
-                      focus:ring-2
-                      focus:ring-[#8B5CF6]/30
-                      transition-all
-                      duration-300
-                      appearance-none
-                      cursor-pointer
-                    "
+                    className="w-full py-3 px-4 rounded-xl bg-white text-sm font-bold text-gray-900 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300 appearance-none cursor-pointer"
                   >
                     <option value="especialista">Médico Especialista</option>
                     <option value="departamento">Asistente (Depto. Historias Clinicas)</option>
-                    {/* Agregado el rol Directivo para que puedan loguearse */}
                     <option value="directivo">Directivo / Administrador</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-500">
@@ -289,43 +245,32 @@ export default function Login() {
               <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
                 Email
               </label>
-
               <input
                 type="email"
                 name="correo"
                 value={formData.correo}
                 onChange={handleChange}
-                placeholder="juan_miguel0505@outlook.com"
+                placeholder="doctor@hospital.com"
                 required
-                className="
-                w-full
-                py-3
-                px-4
-                rounded-xl
-                bg-white
-                text-sm
-                font-semibold
-                text-gray-900
-                placeholder:text-gray-400
-                placeholder:font-medium
-                outline-none
-                border
-                border-transparent
-                focus:border-[#8B5CF6]
-                focus:ring-2
-                focus:ring-[#8B5CF6]/30
-                transition-all
-                duration-300
-                "
+                className="w-full py-3 px-4 rounded-xl bg-white text-sm font-semibold text-gray-900 placeholder:text-gray-400 placeholder:font-medium outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300"
               />
             </div>
 
-            {/* PASSWORD */}
+            {/* PASSWORD (Se oculta si está recuperando clave) */}
             {!isResettingPassword && (
               <div>
-                <label className="block text-gray-200 text-sm font-bold mb-2 tracking-wide">
-                  Contraseña
-                </label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-gray-200 text-sm font-bold tracking-wide">
+                    Contraseña
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsResettingPassword(true)}
+                    className="text-[#8B5CF6] hover:text-[#A78BFA] text-xs font-bold transition-colors outline-none"
+                  >
+                    ¿Olvidaste tu clave?
+                  </button>
+                </div>
 
                 <div className="relative">
                   <input
@@ -335,97 +280,74 @@ export default function Login() {
                     onChange={handleChange}
                     placeholder="••••••••••"
                     required
-                    className="
-                    w-full
-                    py-3
-                    px-4
-                    pr-12
-                    rounded-xl
-                    bg-white
-                    text-sm
-                    font-bold
-                    text-gray-900
-                    placeholder:text-gray-400
-                    outline-none
-                    border
-                    border-transparent
-                    focus:border-[#8B5CF6]
-                    focus:ring-2
-                    focus:ring-[#8B5CF6]/30
-                    transition-all
-                    duration-300
-                    "
+                    className="w-full py-3 px-4 pr-12 rounded-xl bg-white text-sm font-bold text-gray-900 placeholder:text-gray-400 outline-none border border-transparent focus:border-[#8B5CF6] focus:ring-2 focus:ring-[#8B5CF6]/30 transition-all duration-300"
                   />
-
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
                   >
-                    {showPassword
-                      ? <EyeOff size={18}/>
-                      : <Eye size={18}/>
-                    }
+                    {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* BOTÓN */}
+            {/* BOTÓN PRINCIPAL */}
             <button
               type="submit"
               disabled={loading}
-              className="
-              w-full
-              py-3
-              mt-4
-              rounded-xl
-              bg-[#8B5CF6]
-              hover:bg-[#7C3AED]
-              text-white
-              text-sm
-              font-extrabold
-              tracking-wide
-              shadow-lg
-              shadow-[#8B5CF6]/20
-              transition-all
-              duration-300
-              transform
-              hover:-translate-y-0.5
-              "
+              className="w-full py-3 mt-4 rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-extrabold tracking-wide shadow-lg shadow-[#8B5CF6]/20 transition-all duration-300 transform hover:-translate-y-0.5"
             >
               {loading
                 ? "Procesando..."
-                : isResettingPassword ? "Recuperar Contraseña" : "Iniciar Sesión"}
+                : isResettingPassword ? "Enviar Enlace de Recuperación" : "Iniciar Sesión"}
             </button>
+            
+            {/* BOTÓN SECUNDARIO Y AYUDA (Solo aparece en modo recuperación) */}
+            {isResettingPassword && (
+              <div className="animate-[fadeIn_0.3s_ease-out]">
+                <button
+                  type="button"
+                  onClick={() => setIsResettingPassword(false)}
+                  className="w-full py-3 mt-2 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 text-sm font-bold tracking-wide transition-all duration-300"
+                >
+                  Cancelar y Volver
+                </button>
+                
+                {/* MENSAJE PARA USUARIOS QUE OLVIDARON EL CORREO */}
+                <p className="text-center text-xs text-slate-500 font-medium mt-8 leading-relaxed">
+                  ¿No recuerdas el correo con el que te registraste? <br className="hidden sm:block" />
+                  <span className="text-slate-400">Contacta a la Junta Directiva para verificar tu usuario en el sistema.</span>
+                </p>
+              </div>
+            )}
 
           </form>
 
-          <div className="text-center mt-8">
-            <p className="text-[#A1A1AA] text-sm font-semibold">
-              ¿No tienes cuenta?
-
-              <Link
-                to="/register"
-                className="text-[#8B5CF6] ml-2 font-extrabold hover:text-[#A78BFA] transition-colors"
-              >
-                Crear Cuenta
-              </Link>
-
-              <div className="flex justify-center items-center w-full">
-             <Link to="/" className="text-xs font-bold text-slate-500 flex items-center gap-1.5 hover:text-white transition-colors group mt-2"><ArrowLeft size={19} className="group-hover:-translate-x-1 transition-transform" /> 
-               Volver al inicio
-                </Link></div>
-            </p>
-          </div>
+          {/* FOOTER - REGISTRO */}
+          {!isResettingPassword && (
+            <div className="text-center mt-8 animate-[fadeIn_0.3s_ease-out]">
+              <p className="text-[#A1A1AA] text-sm font-semibold">
+                ¿No tienes cuenta?
+                <Link to="/register" className="text-[#8B5CF6] ml-2 font-extrabold hover:text-[#A78BFA] transition-colors">
+                  Crear Cuenta
+                </Link>
+              </p>
+              <div className="flex justify-center items-center w-full mt-2">
+                <Link to="/" className="text-xs font-bold text-slate-500 flex items-center gap-1.5 hover:text-white transition-colors group">
+                  <ArrowLeft size={19} className="group-hover:-translate-x-1 transition-transform" /> 
+                  Volver al inicio
+                </Link>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
 
     </div>
-
   </div>
-
 </div>
 );
 }
