@@ -61,7 +61,6 @@ export default function Login() {
     if (isResettingPassword) {
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.correo, {
-          // Asegúrate de tener la vista de ActualizarContrasena en esta ruta
           redirectTo: window.location.origin + '/actualizar-contrasena', 
         });
         if (error) throw error;

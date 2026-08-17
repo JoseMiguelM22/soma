@@ -8,8 +8,17 @@ export default function Home() {
   // ESTADO PARA EL VIDEO FLOTANTE
   const [activeVideo, setActiveVideo] = useState(null);
 
-  // Efecto para el Loader inicial
+  // Efecto para el Loader inicial Y EL POLICÍA DE TRÁNSITO 🚨
   useEffect(() => {
+    // 1. EL POLICÍA REVISA LA URL PRIMERO
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      // Si traes llave, te manda a cambiar la clave inmediatamente
+      window.location.replace('/actualizar-contrasena' + hash);
+      return; // Detenemos la carga del Home aquí mismo
+    }
+
+    // 2. SI NO HAY LLAVE, CARGA LA PÁGINA NORMAL
     document.body.style.overflow = 'hidden';
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -25,7 +34,13 @@ export default function Home() {
       {/* MODAL REPRODUCTOR DE VIDEO (Elegante, difuminado y con líneas verdes) */}
       {/* ========================================================================= */}
       {activeVideo && (
-        <div className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/80 backdrop-blur-xl animate-[fadeIn_0.3s_ease-out]">
+        <div 
+          className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/80 backdrop-blur-xl animate-[fadeIn_0.3s_ease-out]"
+          /* Cierra el modal si hacen clic en el fondo oscuro */
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveVideo(null);
+          }}
+        >
           
           {/* Botón de Cerrar */}
           <button 
@@ -41,6 +56,7 @@ export default function Home() {
               src={activeVideo} 
               controls 
               autoPlay 
+              playsInline
               className="w-full h-auto max-h-[85vh] rounded-[1.5rem] md:rounded-[2rem] shadow-[0_0_60px_rgba(176,255,76,0.3)] border-2 border-[#b0ff4c] bg-black outline-none"
             />
           </div>
@@ -415,7 +431,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* CREADOR 3: Gregory (¡Foto a full color corregida!) */}
+            {/* CREADOR 3: Gregory */}
             <div className="bg-gradient-to-b from-[#2a2a2a] to-[rgb(34,34,34)] rounded-[2.5rem] p-6 flex flex-col h-full border border-white/5 transition-colors">
               <div className="w-full flex justify-center mb-4 text-center">
                 <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] border border-white/10 px-4 py-1.5 rounded-full">
@@ -438,7 +454,7 @@ export default function Home() {
                   <h4 className="text-white font-bold text-xl md:text-2xl mb-1">Gregory Cedetto</h4>
                   <p className="text-white/40 text-xs font-medium tracking-wide">+15 años de experiencia</p>
                 </div>
-                <button onClick={() => setActiveVideo('/gregory_video.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform shrink-0 ml-2">
+                <button onClick={() => setActiveVideo('/gregory.mp4')} className="bg-[#b0ff4c] text-black p-2 md:p-3 rounded-full hover:scale-110 transition-transform shrink-0 ml-2">
                   <ArrowUpRight size={20} />
                 </button>
               </div>

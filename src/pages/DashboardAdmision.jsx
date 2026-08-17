@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, LogOut, 
   Menu, Sun, Moon, PanelLeft, Clock, ArrowLeft, CheckCircle, 
-  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, CheckCircle2, Check, MessageCircle, Phone
+  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, CheckCircle2, Check, MessageCircle, Phone, User
 } from 'lucide-react';
 
 import Parte1 from './Parte1';
