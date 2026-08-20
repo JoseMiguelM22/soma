@@ -42,7 +42,7 @@ export default function Agendas() {
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [actualizandoEstado, setActualizandoEstado] = useState(false);
 
-  const listaConsultorios = ["Medics", "SOMA Principal"];
+  const listaConsultorios = ["Dr. Juvenal Bracho"];
 
   // ================= CARGA DE DATOS =================
   const fetchData = async () => {
@@ -337,12 +337,10 @@ export default function Agendas() {
           </div>
           <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col gap-2 ${isCollapsed ? 'items-center' : ''}`}>
   
-  {/* NUEVO BOTÓN DE PERFIL */}
   <Link to="/perfil" className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-[#0081a7] hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
     <User size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Mi Perfil</span>}
   </Link>
 
-  {/* TU BOTÓN DE CERRAR SESIÓN (Ya lo tienes) */}
   <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
     <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
   </button>
@@ -371,164 +369,185 @@ export default function Agendas() {
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
             
+            {/* ================= CONTROLES SUPERIORES (FILTROS Y BOTONES) ================= */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
-              <div>
+              
+              {/* Título */}
+              <div className="shrink-0 text-center xl:text-left">
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Agenda</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-0.5">Gestiona tus consultas</p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button onClick={goToToday} className="px-4 py-2 text-sm font-bold border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors shadow-sm">
-                  Hoy
-                </button>
+              {/* Botonera Responsiva */}
+              <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 w-full xl:w-auto">
                 
-                <div className="flex items-center border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-sm overflow-hidden">
-                  <button onClick={prevDate} className="p-2 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-500 border-r border-slate-200 dark:border-white/10 transition-colors">
-                    <ChevronLeft size={18} />
+                {/* 1. Navegador de Fechas */}
+                <div className="flex w-full sm:w-auto gap-2">
+                  <button onClick={goToToday} className="flex-1 sm:flex-none px-4 py-2.5 text-sm font-bold border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors shadow-sm">
+                    Hoy
                   </button>
-                  <span className="px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 min-w-[140px] text-center capitalize">
-                    {formatHeaderRange()}
-                  </span>
-                  <button onClick={nextDate} className="p-2 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-500 border-l border-slate-200 dark:border-white/10 transition-colors">
-                    <ChevronRight size={18} />
-                  </button>
+                  
+                  <div className="flex flex-[2] sm:flex-none items-center justify-between border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-sm overflow-hidden">
+                    <button onClick={prevDate} className="p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-500 border-r border-slate-200 dark:border-white/10 transition-colors">
+                      <ChevronLeft size={18} />
+                    </button>
+                    <span className="px-2 py-2 text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 min-w-[120px] sm:min-w-[140px] text-center capitalize truncate">
+                      {formatHeaderRange()}
+                    </span>
+                    <button onClick={nextDate} className="p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-500 border-l border-slate-200 dark:border-white/10 transition-colors">
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </div>
 
-                <select 
-                  value={viewMode} 
-                  onChange={(e) => setViewMode(e.target.value)} 
-                  className="px-4 py-2.5 text-sm font-bold border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] text-slate-700 dark:text-slate-300 outline-none shadow-sm cursor-pointer hidden sm:block"
-                >
-                  <option value="Semana">Semana</option>
-                  <option value="Mes">Mes</option>
-                </select>
-
-                <div className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-sm hidden md:flex">
-                  <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">CONSUL.</span>
-                  <select className="text-sm font-bold bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 border-none">
-                    <option>Todos</option>
-                    {listaConsultorios.map(c => <option key={c}>{c}</option>)}
+                {/* 2. Selectores (Ahora 100% visibles en móvil) */}
+                <div className="flex w-full sm:w-auto gap-2">
+                  <select 
+                    value={viewMode} 
+                    onChange={(e) => setViewMode(e.target.value)} 
+                    className="flex-1 sm:flex-none px-3 py-2.5 text-sm font-bold border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] text-slate-700 dark:text-slate-300 outline-none shadow-sm cursor-pointer"
+                  >
+                    <option value="Semana">Semana</option>
+                    <option value="Mes">Mes</option>
                   </select>
+
+                  <div className="flex-[2] sm:flex-none flex items-center gap-2 px-3 py-2 border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] shadow-sm overflow-hidden">
+                    <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase hidden md:block shrink-0">CONSUL.</span>
+                    <select className="w-full text-sm font-bold bg-transparent outline-none cursor-pointer text-slate-700 dark:text-slate-200 border-none truncate">
+                      <option>Todos los consultorios</option>
+                      {listaConsultorios.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
                 </div>
+
               </div>
             </div>
 
             {/* ================= CALENDARIO ================= */}
-            <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden">
+            <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden flex flex-col">
               
-              {viewMode === 'Mes' && (
-                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white capitalize">
-                    {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                  </h3>
-                  <div className="flex gap-2">
-                    <button onClick={prevDate} className="px-4 py-1.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg hover:bg-slate-50 transition-colors">Anterior</button>
-                    <button onClick={nextDate} className="px-4 py-1.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg hover:bg-slate-50 transition-colors">Siguiente</button>
-                  </div>
-                </div>
-              )}
-
-              {/* === VISTA SEMANA === */}
-              {viewMode === 'Semana' && (
-                <div className="grid grid-cols-7 min-w-[900px] overflow-x-auto">
-                  {weekDays.map((dia, idx) => {
-                    const citasDia = getCitasParaDia(dia);
-                    const isHoy = isToday(dia);
-                    return (
-                      <div key={idx} className="flex flex-col border-r last:border-r-0 border-slate-100 dark:border-white/5 min-h-[650px] bg-slate-50/30 dark:bg-transparent">
-                        
-                        <div className="p-4 flex items-center justify-center gap-2 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-[#161616]">
-                          <span className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">{dia.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
-                          <div className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-sm transition-colors ${isHoy ? 'bg-[#0081a7] text-white shadow-md' : 'text-slate-700 dark:text-slate-200'}`}>
-                            {dia.getDate()}
-                          </div>
-                        </div>
-                        
-                        <div className="flex-1 p-2 space-y-3 relative group">
-                          {loading ? (
-                             <div className="animate-pulse h-16 bg-slate-200 dark:bg-white/5 rounded-xl w-full"></div>
-                          ) : citasDia.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
-                               <Clock className="text-slate-300 dark:text-white/10 mb-2" size={24} />
-                            </div>
-                          ) : (
-                            citasDia.map(c => (
-                              <div 
-                                key={c.id} 
-                                onClick={() => openCitaDetails(c)}
-                                className={`bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 cursor-pointer relative overflow-hidden ${getStatusColor(c)}`}
-                              >
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <div className={`w-2 h-2 rounded-full ${getStatusColorSolid(c)}`}></div>
-                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatHora(c.fecha_consulta)}</span>
-                                </div>
-                                <p className="text-[13px] font-bold text-slate-900 dark:text-white truncate">{c.pacientes?.nombres} {c.pacientes?.apellidos}</p>
-                                <p className="text-[10px] text-slate-500 mt-1 truncate">{c.motivo || getStatusText(c)}</p>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* === VISTA MES === */}
-              {viewMode === 'Mes' && (
-                <div className="min-w-[900px]">
-                  <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#161616]">
-                    {['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'].map(d => (
-                      <div key={d} className="py-4 text-center text-[11px] font-bold text-slate-400 tracking-widest">{d}</div>
-                    ))}
-                  </div>
-                  
-                  <div className="grid grid-cols-7 auto-rows-fr">
-                    {monthDays.map((dia, idx) => {
-                      const isHoy = isToday(dia);
-                      const isCurrentMonth = dia.getMonth() === currentDate.getMonth();
+              {/* Mensajito sutil de ayuda solo para teléfonos */}
+              <div className="md:hidden flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold py-3 bg-slate-50/50 dark:bg-black/20 border-b border-slate-100 dark:border-white/5 animate-pulse">
+                <span>← Desliza para ver la agenda completa →</span>
+              </div>
+              
+              {/* Contenedor que permite el Scroll Horizontal */}
+              <div className="w-full overflow-x-auto custom-scrollbar pb-2">
+                
+                {/* VISTA SEMANA */}
+                {viewMode === 'Semana' && (
+                  <div className="grid grid-cols-7 min-w-[900px]">
+                    {weekDays.map((dia, idx) => {
                       const citasDia = getCitasParaDia(dia);
-                      
+                      const isHoy = isToday(dia);
                       return (
-                        <div key={idx} className={`min-h-[140px] border-b border-r border-slate-100 dark:border-white/5 p-2 transition-colors ${!isCurrentMonth ? 'bg-slate-50/50 dark:bg-black/20' : 'bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'} ${isHoy ? 'border-cyan-300 dark:border-cyan-500/50 bg-cyan-50/10' : ''}`}>
-                          <div className="flex justify-between items-start mb-2">
-                            <div></div> 
-                            <div className="flex items-center gap-2">
-                              {isHoy && <span className="bg-[#0081a7] text-white text-[9px] font-black px-1.5 py-0.5 rounded">HOY</span>}
-                              <div className={`w-7 h-7 flex items-center justify-center rounded-full font-bold text-sm ${isHoy ? 'bg-[#0081a7] text-white' : !isCurrentMonth ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-200'}`}>
-                                {dia.getDate()}
-                              </div>
+                        <div key={idx} className="flex flex-col border-r last:border-r-0 border-slate-100 dark:border-white/5 min-h-[650px] bg-slate-50/30 dark:bg-transparent">
+                          
+                          <div className="p-4 flex items-center justify-center gap-2 border-b border-slate-100 dark:border-white/5 bg-white dark:bg-[#161616]">
+                            <span className="text-[11px] font-bold text-slate-400 tracking-widest uppercase">{dia.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
+                            <div className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-sm transition-colors ${isHoy ? 'bg-[#0081a7] text-white shadow-md' : 'text-slate-700 dark:text-slate-200'}`}>
+                              {dia.getDate()}
                             </div>
                           </div>
-
-                          <div className="space-y-1.5">
-                            {citasDia.slice(0, 3).map(c => (
-                              <div 
-                                key={c.id} 
-                                onClick={() => openCitaDetails(c)}
-                                className="flex items-center justify-between group cursor-pointer"
-                              >
-                                <div className="flex items-center gap-1.5 overflow-hidden">
-                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColorSolid(c)}`}></div>
-                                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate group-hover:text-[#0081a7] dark:group-hover:text-cyan-400 transition-colors">
-                                    {c.pacientes?.nombres.split(' ')[0]} {c.pacientes?.apellidos.charAt(0)}.
-                                  </span>
-                                </div>
-                                <span className="text-[10px] text-slate-400 font-medium shrink-0">{formatHora(c.fecha_consulta)}</span>
+                          
+                          <div className="flex-1 p-2 space-y-3 relative group">
+                            {loading ? (
+                               <div className="animate-pulse h-16 bg-slate-200 dark:bg-white/5 rounded-xl w-full"></div>
+                            ) : citasDia.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <Clock className="text-slate-300 dark:text-white/10 mb-2" size={24} />
                               </div>
-                            ))}
-                            {citasDia.length > 3 && (
-                              <div className="text-[10px] font-bold text-slate-400 mt-1 pl-3">+ {citasDia.length - 3} más</div>
+                            ) : (
+                              citasDia.map(c => (
+                                <div 
+                                  key={c.id} 
+                                  onClick={() => openCitaDetails(c)}
+                                  className={`bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 cursor-pointer relative overflow-hidden ${getStatusColor(c)}`}
+                                >
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <div className={`w-2 h-2 rounded-full ${getStatusColorSolid(c)}`}></div>
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatHora(c.fecha_consulta)}</span>
+                                  </div>
+                                  <p className="text-[13px] font-bold text-slate-900 dark:text-white truncate">{c.pacientes?.nombres} {c.pacientes?.apellidos}</p>
+                                  <p className="text-[10px] text-slate-500 mt-1 truncate">{c.motivo || getStatusText(c)}</p>
+                                </div>
+                              ))
                             )}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                </div>
-              )}
+                )}
 
+                {/* VISTA MES */}
+                {viewMode === 'Mes' && (
+                  <div className="min-w-[900px]">
+                    
+                    {/* Header del mes */}
+                    <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#161616] sticky left-0">
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white capitalize">
+                        {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                      </h3>
+                      <div className="flex gap-2">
+                        <button onClick={prevDate} className="px-4 py-1.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg hover:bg-slate-50 transition-colors">Anterior</button>
+                        <button onClick={nextDate} className="px-4 py-1.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-lg hover:bg-slate-50 transition-colors">Siguiente</button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#161616]">
+                      {['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'].map(d => (
+                        <div key={d} className="py-4 text-center text-[11px] font-bold text-slate-400 tracking-widest">{d}</div>
+                      ))}
+                    </div>
+                    
+                    <div className="grid grid-cols-7 auto-rows-fr">
+                      {monthDays.map((dia, idx) => {
+                        const isHoy = isToday(dia);
+                        const isCurrentMonth = dia.getMonth() === currentDate.getMonth();
+                        const citasDia = getCitasParaDia(dia);
+                        
+                        return (
+                          <div key={idx} className={`min-h-[140px] border-b border-r border-slate-100 dark:border-white/5 p-2 transition-colors ${!isCurrentMonth ? 'bg-slate-50/50 dark:bg-black/20' : 'bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'} ${isHoy ? 'border-cyan-300 dark:border-cyan-500/50 bg-cyan-50/10' : ''}`}>
+                            <div className="flex justify-between items-start mb-2">
+                              <div></div> 
+                              <div className="flex items-center gap-2">
+                                {isHoy && <span className="bg-[#0081a7] text-white text-[9px] font-black px-1.5 py-0.5 rounded">HOY</span>}
+                                <div className={`w-7 h-7 flex items-center justify-center rounded-full font-bold text-sm ${isHoy ? 'bg-[#0081a7] text-white' : !isCurrentMonth ? 'text-slate-400 dark:text-slate-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                                  {dia.getDate()}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {citasDia.slice(0, 3).map(c => (
+                                <div 
+                                  key={c.id} 
+                                  onClick={() => openCitaDetails(c)}
+                                  className="flex items-center justify-between group cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-1.5 overflow-hidden">
+                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColorSolid(c)}`}></div>
+                                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate group-hover:text-[#0081a7] dark:group-hover:text-cyan-400 transition-colors">
+                                      {c.pacientes?.nombres.split(' ')[0]} {c.pacientes?.apellidos.charAt(0)}.
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-medium shrink-0">{formatHora(c.fecha_consulta)}</span>
+                                </div>
+                              ))}
+                              {citasDia.length > 3 && (
+                                <div className="text-[10px] font-bold text-slate-400 mt-1 pl-3">+ {citasDia.length - 3} más</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
           </div>
         </div>
       </main>

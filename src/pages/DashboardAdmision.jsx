@@ -4,7 +4,8 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar, LogOut, 
   Menu, Sun, Moon, PanelLeft, Clock, ArrowLeft, CheckCircle, 
-  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, CheckCircle2, Check, MessageCircle, Phone, User
+  CalendarDays, FilePlus, Clipboard, X, ChevronDown, AlertCircle, 
+  CheckCircle2, Check, MessageCircle, Phone, User, Lock, Save 
 } from 'lucide-react';
 
 import Parte1 from './Parte1';
@@ -37,7 +38,7 @@ export default function DashboardAdmision() {
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [tempPacienteId, setTempPacienteId] = useState(null);
   const [patientPhone, setPatientPhone] = useState('');
-  const [consultaCreada, setConsultaCreada] = useState(null); // <--- NUEVO: Para guardar la info y pasarla a Historias
+  const [consultaCreada, setConsultaCreada] = useState(null); 
 
   const initialFormIVSS = {
     centro_asistencial: '', historia_n: '', servicio: '', piso: '', ala: '', sala_cuarto: '', cama: '',
@@ -278,7 +279,6 @@ export default function DashboardAdmision() {
     setGuardando(false);
     setVistaActual('inicio');
     
-    // 🔥 REDIRECCIÓN INTELIGENTE MANDANDO LOS DATOS DE LA CONSULTA 🔥
     navigate('/historias', { state: { autoOpenConsulta: consultaCreada } });
   };
 
@@ -367,12 +367,10 @@ export default function DashboardAdmision() {
           </div>
           <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col gap-2 ${isCollapsed ? 'items-center' : ''}`}>
   
-  {/* NUEVO BOTÓN DE PERFIL */}
   <Link to="/perfil" className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-[#0081a7] hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
     <User size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Mi Perfil</span>}
   </Link>
 
-  {/* TU BOTÓN DE CERRAR SESIÓN (Ya lo tienes) */}
   <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
     <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
   </button>
@@ -392,7 +390,7 @@ export default function DashboardAdmision() {
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
+        <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10 relative">
           
           {/* ================= VISTA 1: DASHBOARD INICIO ================= */}
           {vistaActual === 'inicio' && (
@@ -535,58 +533,106 @@ export default function DashboardAdmision() {
 
           {/* ================= VISTA 2: FORMULARIO IVSS 15-108 ================= */}
           {vistaActual === 'crear_historia' && (
-            <div className="animate-[fadeIn_0.3s_ease-out] pb-20 mt-6 px-4 relative">
+            <div className="animate-[fadeIn_0.3s_ease-out] mt-6 relative">
               
-              <div className="bg-white dark:bg-[#16161a] p-4 rounded-2xl shadow-lg mb-8 flex flex-col md:flex-row justify-between items-center gap-4 max-w-[210mm] mx-auto border border-slate-200 dark:border-white/10 z-40 sticky top-20">
-                <button onClick={() => setVistaActual('inicio')} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 dark:hover:text-white transition-colors">
-                  <ArrowLeft size={16} /> Volver a Inicio
-                </button>
-                <div className="flex items-center gap-6">
-                   <div className="text-slate-500 dark:text-slate-400 text-sm font-bold tracking-widest uppercase hidden md:block">Modo de Edición Libre (F-15-108)</div>
-                   <button onClick={handleGuardarHistoria} disabled={guardando} className="bg-[#10b981] hover:bg-[#059669] text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 transition-transform hover:-translate-y-0.5 disabled:opacity-50 flex items-center gap-2 w-full md:w-auto justify-center">
-                     {guardando ? 'Guardando...' : <><Clipboard size={18}/> Guardar en Historias Clínicas</>}
-                   </button>
+              {/* ================== CONTENEDOR DE BOTONES FIJO (MÓVIL Y ESCRITORIO) ================== */}
+              <div className={`
+                fixed bottom-0 right-0 z-[100] transition-all duration-300
+                ${isCollapsed ? 'md:left-24' : 'md:left-64'} left-0
+                bg-white/95 dark:bg-[#111111]/95 backdrop-blur-xl border-t border-slate-200 dark:border-white/10 
+                p-4 pb-8 md:pb-6 flex justify-center shadow-[0_-20px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-20px_40px_rgba(0,0,0,0.5)] 
+                rounded-t-[2rem]
+              `}>
+                <div className="w-full max-w-[210mm] flex items-center justify-between gap-3">
+                  
+                  {/* BOTÓN VOLVER */}
+                  <button 
+                    onClick={() => setVistaActual('inicio')} 
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 py-3.5 px-4 md:py-3 md:px-6 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 font-bold hover:text-slate-900 dark:hover:text-white transition-colors"
+                  >
+                    <ArrowLeft size={18} />
+                    <span className="hidden sm:inline">Volver a Inicio</span>
+                    <span className="sm:hidden">Volver</span>
+                  </button>
+
+                  {/* CONTENEDOR DERECHO EN PC / BOTÓN GUARDAR EN MÓVIL */}
+                  <div className="flex-[2] md:flex-none flex items-center justify-end gap-4 md:gap-6">
+                    <div className="text-slate-500 dark:text-slate-400 text-sm font-bold tracking-widest uppercase hidden md:block">
+                      Modo de Edición Libre
+                    </div>
+                    
+                    <button 
+                      onClick={handleGuardarHistoria} 
+                      disabled={guardando} 
+                      className="w-full md:w-auto flex items-center justify-center gap-2 py-3.5 px-4 md:py-3 md:px-8 rounded-xl bg-[#10b981] hover:bg-[#059669] text-white text-sm font-bold shadow-lg shadow-[#10b981]/20 transition-all transform hover:-translate-y-0.5 disabled:opacity-50"
+                    >
+                      {guardando ? (
+                        'Guardando...'
+                      ) : (
+                        <>
+                          <Save size={18} className="md:hidden" />
+                          <Clipboard size={18} className="hidden md:block" />
+                          <span className="hidden sm:inline">Guardar en Historias Clínicas</span>
+                          <span className="sm:hidden">Guardar Historia</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
                 </div>
               </div>
 
-              {/* ================= CONTENEDOR 6 PÁGINAS A4 ================= */}
-              <div className="w-[210mm] mx-auto space-y-12 pb-20">
-                <Parte1 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
-                <Parte2 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
-                <Parte3 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+              {/* ================= CONTENEDOR 6 PÁGINAS A4 (AHORA CON SCROLL HORIZONTAL) ================= */}
+              {/* Le agregué pb-32 para que la barra inferior no tape el contenido ni en móvil ni en PC */}
+              <div className="w-full overflow-x-auto custom-scrollbar pb-32">
+                
+                {/* Mensajito sutil de ayuda solo para teléfonos */}
+                <div className="md:hidden flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold mb-4 px-4 animate-pulse">
+                  <span>← Desliza hacia los lados para ver completo →</span>
+                </div>
+
+                <div className="min-w-[210mm] w-[210mm] mx-auto space-y-12 px-4 md:px-0">
+                  <Parte1 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+                  <Parte2 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+                  <Parte3 formIVSS={formIVSS} handleIVSSChange={handleIVSSChange} marcas={marcas} toggleMarca={toggleMarca} />
+                </div>
+                
               </div>
             </div>
           )}
 
         </div>
-            {/* ================= PANTALLA DE BLOQUEO (CUENTA PENDIENTE) ================= */}
-{userData?.estado_cuenta === 'Pendiente' && (
-  <div className="absolute inset-0 z-[9000] bg-slate-100/60 dark:bg-[#050505]/70 backdrop-blur-md flex items-center justify-center p-4">
-    <div className="bg-white dark:bg-[#111111] p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-slate-200 dark:border-white/10 animate-[fadeIn_0.3s_ease-out]">
-      <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-amber-50 dark:border-amber-900/10">
-        {/* Asegúrate de tener importado el ícono Lock de lucide-react en el archivo */}
-        <Lock size={36} />
-      </div>
-      <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Cuenta en Revisión</h2>
-      <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
-        Has iniciado sesión correctamente, pero tus funciones están bloqueadas de forma temporal. La directiva debe verificar tus credenciales y aprobar tu cuenta para que puedas interactuar con el sistema.
-      </p>
-      <button 
-        onClick={handleLogout} 
-        className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 py-3 rounded-xl font-bold transition-colors"
-      >
-        Cerrar Sesión
-      </button>
-    </div>
-  </div>
-)}
+
+        {/* ================= PANTALLA DE BLOQUEO (CUENTA PENDIENTE) ================= */}
+        {userData?.estado_cuenta === 'Pendiente' && (
+          <div className="absolute inset-0 z-[9000] bg-slate-100/60 dark:bg-[#050505]/70 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#111111] p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-slate-200 dark:border-white/10 animate-[fadeIn_0.3s_ease-out]">
+              <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-amber-50 dark:border-amber-900/10">
+                <Lock size={36} />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Cuenta en Revisión</h2>
+              <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
+                Has iniciado sesión correctamente, pero tus funciones están bloqueadas de forma temporal. La directiva debe verificar tus credenciales y aprobar tu cuenta para que puedas interactuar con el sistema.
+              </p>
+              <button 
+                onClick={handleLogout} 
+                className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 py-3 rounded-xl font-bold transition-colors"
+              >
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        )}
 
       </main>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        /* Mejoramos el scroll horizontal para que sea cómodo con el dedo en móviles */
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; }
+        
         .custom-scrollbar-gruesa::-webkit-scrollbar { width: 10px; }
         .custom-scrollbar-gruesa::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 0 0 10px 10px; }
         .custom-scrollbar-gruesa::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; }
