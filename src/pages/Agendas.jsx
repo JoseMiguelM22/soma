@@ -4,7 +4,8 @@ import { supabase } from '../services/supabaseClient';
 import { 
   Home, Users, FileText, Calendar as CalendarIcon, LogOut, 
   Menu, Sun, Moon, X, PanelLeft, Clock, 
-  ChevronLeft, ChevronRight, MessageCircle, User
+  ChevronLeft, ChevronRight, MessageCircle, User, Plus, Save,
+  Search, IdCard // <-- Agregamos los íconos Search e IdCard
 } from 'lucide-react';
 
 export default function Agendas() {
@@ -36,13 +37,37 @@ export default function Agendas() {
   const [citas, setCitas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ================= MODAL DETALLE DE CITA =================
+  // Listas para el formulario de agendar
+  const [listaPacientes, setListaPacientes] = useState([]);
+  const [listaMedicos, setListaMedicos] = useState([]);
+
+  // ================= MODALES DE DETALLE =================
   const [selectedCita, setSelectedCita] = useState(null);
+  const [diaSeleccionado, setDiaSeleccionado] = useState(null); // NUEVO: Para ver todas las citas de un día
+  
   const [remitiendo, setRemitiendo] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [actualizandoEstado, setActualizandoEstado] = useState(false);
 
-  const listaConsultorios = ["Dr. Juvenal Bracho"];
+  // ================= MODAL AGENDAR CITA Y BUSCADORES =================
+  const [showAgendarModal, setShowAgendarModal] = useState(false);
+  const [agendando, setAgendando] = useState(false);
+  
+  // Estados para los buscadores predictivos
+  const [busquedaPaciente, setBusquedaPaciente] = useState('');
+  const [mostrarDropdownPac, setMostrarDropdownPac] = useState(false);
+  const [busquedaMedico, setBusquedaMedico] = useState('');
+  const [mostrarDropdownMed, setMostrarDropdownMed] = useState(false);
+
+  const [nuevaCita, setNuevaCita] = useState({
+    id_paciente: '',
+    id_medico: '',
+    fecha: '',
+    hora: '08:00',
+    motivo: ''
+  });
+
+  const listaConsultorios = ["Medics", "SOMA Principal"];
 
   // ================= CARGA DE DATOS =================
   const fetchData = async () => {
@@ -53,7 +78,19 @@ export default function Agendas() {
     const { data: dbUser } = await supabase.from('usuarios').select('*').eq('id_auth', session.user.id).single();
     if (dbUser) setUserData(dbUser);
     
+    await cargarListas();
     cargarCitas(dbUser, session.user.id);
+  };
+
+  const cargarListas = async () => {
+    const { data: pacientes } = await supabase.from('pacientes').select('id, nombres, apellidos, cedula').order('nombres');
+    if (pacientes) setListaPacientes(pacientes);
+
+    const { data: medicos } = await supabase.from('usuarios').select('id_auth, nombres, apellidos, rol');
+    if (medicos) {
+      const soloMedicos = medicos.filter(m => ['especialista', 'medico', 'médico'].includes((m.rol || '').toLowerCase()));
+      setListaMedicos(soloMedicos);
+    }
   };
 
   const cargarCitas = async (usuarioDb, authId) => {
@@ -88,17 +125,77 @@ export default function Agendas() {
     return `${userData.nombres.charAt(0)}${userData.apellidos.charAt(0)}`.toUpperCase();
   };
 
-  // Variable maestra para saber si es Especialista
   const esEspecialista = userData && ['especialista', 'medico', 'médico'].includes((userData.rol || '').toLowerCase());
+
+  // ================= LÓGICA DE LOS BUSCADORES PREDICTIVOS =================
+  const pacientesFiltrados = listaPacientes.filter(p => 
+    `${p.nombres} ${p.apellidos} ${p.cedula}`.toLowerCase().includes(busquedaPaciente.toLowerCase())
+  );
+
+  const medicosFiltrados = listaMedicos.filter(m => 
+    `${m.nombres} ${m.apellidos}`.toLowerCase().includes(busquedaMedico.toLowerCase())
+  );
+
+  const openAgendarModal = () => {
+    const d = new Date();
+    const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    
+    setBusquedaPaciente('');
+    setBusquedaMedico('');
+    setNuevaCita({
+      id_paciente: '',
+      id_medico: esEspecialista ? userData.id_auth : '',
+      fecha: hoy,
+      hora: '08:00',
+      motivo: ''
+    });
+
+    if (esEspecialista) {
+      setBusquedaMedico(`Dr(a). ${userData.nombres} ${userData.apellidos}`);
+    }
+
+    setShowAgendarModal(true);
+  };
+
+  const handleNuevaCitaChange = (e) => {
+    setNuevaCita({ ...nuevaCita, [e.target.name]: e.target.value });
+  };
+
+  const handleAgendarCita = async (e) => {
+    e.preventDefault();
+    if (!nuevaCita.id_paciente) return alert("Por favor, selecciona un paciente de la lista desplegable.");
+    if (!nuevaCita.id_medico) return alert("Por favor, selecciona un médico especialista de la lista.");
+    if (!nuevaCita.fecha || !nuevaCita.hora) return alert("La fecha y la hora son obligatorias.");
+
+    setAgendando(true);
+    try {
+      const fechaHoraISO = new Date(`${nuevaCita.fecha}T${nuevaCita.hora}:00`).toISOString();
+
+      const { error } = await supabase.from('consultas').insert([{
+        id_paciente: nuevaCita.id_paciente,
+        id_medico: nuevaCita.id_medico,
+        fecha_consulta: fechaHoraISO,
+        motivo: nuevaCita.motivo,
+        estado: 'Agendada'
+      }]);
+
+      if (error) throw error;
+
+      alert("¡Consulta agendada con éxito!");
+      setShowAgendarModal(false);
+      fetchData(); 
+    } catch (err) {
+      alert("Error al agendar: " + err.message);
+    } finally {
+      setAgendando(false);
+    }
+  };
 
   // ================= ACCIONES RÁPIDAS (WHATSAPP) =================
   const handleWhatsApp = (cita) => {
     const telefono = cita.pacientes?.telefono;
-    
     if (!telefono) return alert("Este paciente no tiene un número de teléfono registrado en el sistema.");
-    
     let num = telefono.replace(/\D/g, '');
-    
     if (num.startsWith('0')) num = '58' + num.substring(1);
     else if (!num.startsWith('58') && num.length === 10) num = '58' + num;
     
@@ -108,7 +205,6 @@ export default function Agendas() {
 
     const mensaje = `¡Hola, ${pacienteNombre}! Le escribimos de SOMA para recordarle su cita médica pautada para el día ${fechaStr} a las ${horaStr}. Por favor, confírmenos su asistencia. ¡Saludos!`;
     const urlMensaje = encodeURIComponent(mensaje);
-    
     window.open(`https://wa.me/${num}?text=${urlMensaje}`, '_blank');
   };
 
@@ -264,7 +360,7 @@ export default function Agendas() {
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      {/* ================= SIDEBAR (MENÚ DE LA IZQUIERDA) ================= */}
+      {/* ================= SIDEBAR ================= */}
       <aside 
         className={`
           fixed inset-y-0 left-0 z-50 
@@ -280,7 +376,7 @@ export default function Agendas() {
         `}>
         <div>
           <div className={`h-16 flex items-center border-b border-slate-200 dark:border-white/5 transition-all ${isCollapsed ? 'justify-center' : 'justify-between px-6'}`}>
-            <Link to={userData?.rol === 'especialista' ? '/dashboard' : '/admision'} className="flex items-center overflow-hidden whitespace-nowrap">
+            <Link to={esEspecialista ? '/dashboard' : '/admision'} className="flex items-center overflow-hidden whitespace-nowrap">
               {isCollapsed ? (
                 <span className="text-cyan-500 text-2xl font-black">S</span>
               ) : (
@@ -300,17 +396,15 @@ export default function Agendas() {
           <div className={`py-6 ${isCollapsed ? 'px-2' : 'px-4'}`}>
             {!isCollapsed && <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-4 px-2 tracking-widest">HERRAMIENTAS</p>}
             <nav className="space-y-2">
-              <Link to={userData?.rol === 'especialista' ? '/dashboard' : '/admision'} className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
+              <Link to={esEspecialista ? '/dashboard' : '/admision'} className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
                 <Home size={20} className="shrink-0" />{!isCollapsed && <span>Inicio</span>}
               </Link>
-              {userData?.rol !== 'especialista' && (
+              {!esEspecialista && (
                 <Link to="/pacientes" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
                   <Users size={20} className="shrink-0" />{!isCollapsed && <span>Pacientes</span>}
                 </Link>
               )}
-              <Link to="/historias" className="flex items-center gap-3 py-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg font-medium transition-colors">
-                <FileText size={20} className="shrink-0" />{!isCollapsed && <span>Historias Clínicas</span>}
-              </Link>
+             
               <Link to="/agenda" className="flex items-center gap-3 py-2.5 bg-cyan-50 dark:bg-[#1e1e1e] text-cyan-700 dark:text-cyan-400 border border-transparent dark:border-white/5 rounded-lg font-bold transition-colors">
                 <CalendarIcon size={20} className="shrink-0" />{!isCollapsed && <span>Agenda</span>}
               </Link>
@@ -318,7 +412,6 @@ export default function Agendas() {
           </div>
         </div>
 
-        {/* ================= PERFIL DE USUARIO UNIFICADO ================= */}
         <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col ${isCollapsed ? 'items-center' : ''}`}>
           <div className={`flex items-center gap-3 mb-4 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
             <div className="w-8 h-8 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-white border border-slate-300 dark:border-white/20">
@@ -336,16 +429,13 @@ export default function Agendas() {
             )}
           </div>
           <div className={`p-4 border-t border-slate-200 dark:border-white/5 flex flex-col gap-2 ${isCollapsed ? 'items-center' : ''}`}>
-  
-  <Link to="/perfil" className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-[#0081a7] hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-    <User size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Mi Perfil</span>}
-  </Link>
-
-  <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
-    <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
-  </button>
-
-</div>
+            <Link to="/perfil" className={`flex items-center gap-3 py-2 w-full text-slate-500 dark:text-slate-400 hover:text-[#0081a7] hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+              <User size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Mi Perfil</span>}
+            </Link>
+            <button onClick={handleLogout} className={`flex items-center gap-3 py-2 w-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg font-bold transition-colors ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}>
+              <LogOut size={20} className="shrink-0" />{!isCollapsed && <span className="whitespace-nowrap">Cerrar Sesión</span>}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -369,20 +459,23 @@ export default function Agendas() {
         <div className="flex-1 overflow-y-auto w-full custom-scrollbar pb-10">
           <div className="p-4 md:p-8 max-w-[1600px] mx-auto w-full animate-[fadeIn_0.3s_ease-out]">
             
-            {/* ================= CONTROLES SUPERIORES (FILTROS Y BOTONES) ================= */}
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
               
-              {/* Título */}
               <div className="shrink-0 text-center xl:text-left">
                 <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Agenda</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mt-0.5">Gestiona tus consultas</p>
               </div>
 
-              {/* Botonera Responsiva */}
               <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 w-full xl:w-auto">
                 
-                {/* 1. Navegador de Fechas */}
-                <div className="flex w-full sm:w-auto gap-2">
+                <button 
+                  onClick={openAgendarModal} 
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#0081a7] hover:bg-[#006b8a] text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-[#0081a7]/20 transition-transform hover:-translate-y-0.5 order-first xl:order-last"
+                >
+                  <Plus size={18} /> Agendar Consulta
+                </button>
+
+                <div className="flex w-full sm:w-auto gap-2 order-2">
                   <button onClick={goToToday} className="flex-1 sm:flex-none px-4 py-2.5 text-sm font-bold border border-slate-200 dark:border-white/10 rounded-xl bg-white dark:bg-[#1a1a1a] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors shadow-sm">
                     Hoy
                   </button>
@@ -400,8 +493,7 @@ export default function Agendas() {
                   </div>
                 </div>
 
-                {/* 2. Selectores (Ahora 100% visibles en móvil) */}
-                <div className="flex w-full sm:w-auto gap-2">
+                <div className="flex w-full sm:w-auto gap-2 order-3">
                   <select 
                     value={viewMode} 
                     onChange={(e) => setViewMode(e.target.value)} 
@@ -426,12 +518,10 @@ export default function Agendas() {
             {/* ================= CALENDARIO ================= */}
             <div className="bg-white dark:bg-[#111111] rounded-[1.5rem] shadow-xl border border-slate-200 dark:border-white/5 overflow-hidden flex flex-col">
               
-              {/* Mensajito sutil de ayuda solo para teléfonos */}
               <div className="md:hidden flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold py-3 bg-slate-50/50 dark:bg-black/20 border-b border-slate-100 dark:border-white/5 animate-pulse">
                 <span>← Desliza para ver la agenda completa →</span>
               </div>
               
-              {/* Contenedor que permite el Scroll Horizontal */}
               <div className="w-full overflow-x-auto custom-scrollbar pb-2">
                 
                 {/* VISTA SEMANA */}
@@ -483,8 +573,6 @@ export default function Agendas() {
                 {/* VISTA MES */}
                 {viewMode === 'Mes' && (
                   <div className="min-w-[900px]">
-                    
-                    {/* Header del mes */}
                     <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-[#161616] sticky left-0">
                       <h3 className="text-xl font-bold text-slate-900 dark:text-white capitalize">
                         {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
@@ -508,8 +596,12 @@ export default function Agendas() {
                         const citasDia = getCitasParaDia(dia);
                         
                         return (
-                          <div key={idx} className={`min-h-[140px] border-b border-r border-slate-100 dark:border-white/5 p-2 transition-colors ${!isCurrentMonth ? 'bg-slate-50/50 dark:bg-black/20' : 'bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'} ${isHoy ? 'border-cyan-300 dark:border-cyan-500/50 bg-cyan-50/10' : ''}`}>
-                            <div className="flex justify-between items-start mb-2">
+                          <div 
+                            key={idx} 
+                            onClick={() => setDiaSeleccionado(dia)} // HACE CLICKABLE TODO EL DÍA
+                            className={`min-h-[140px] border-b border-r border-slate-100 dark:border-white/5 p-2 cursor-pointer transition-colors ${!isCurrentMonth ? 'bg-slate-50/50 dark:bg-black/20' : 'bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'} ${isHoy ? 'border-cyan-300 dark:border-cyan-500/50 bg-cyan-50/10' : ''}`}
+                          >
+                            <div className="flex justify-between items-start mb-2 pointer-events-none">
                               <div></div> 
                               <div className="flex items-center gap-2">
                                 {isHoy && <span className="bg-[#0081a7] text-white text-[9px] font-black px-1.5 py-0.5 rounded">HOY</span>}
@@ -519,13 +611,9 @@ export default function Agendas() {
                               </div>
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div className="space-y-1.5 pointer-events-none">
                               {citasDia.slice(0, 3).map(c => (
-                                <div 
-                                  key={c.id} 
-                                  onClick={() => openCitaDetails(c)}
-                                  className="flex items-center justify-between group cursor-pointer"
-                                >
+                                <div key={c.id} className="flex items-center justify-between group">
                                   <div className="flex items-center gap-1.5 overflow-hidden">
                                     <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${getStatusColorSolid(c)}`}></div>
                                     <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate group-hover:text-[#0081a7] dark:group-hover:text-cyan-400 transition-colors">
@@ -536,7 +624,9 @@ export default function Agendas() {
                                 </div>
                               ))}
                               {citasDia.length > 3 && (
-                                <div className="text-[10px] font-bold text-slate-400 mt-1 pl-3">+ {citasDia.length - 3} más</div>
+                                <div className="text-[11px] font-black text-[#0081a7] dark:text-cyan-400 mt-1 pl-3 bg-cyan-50 dark:bg-cyan-900/20 py-0.5 rounded">
+                                  + Ver las {citasDia.length} citas
+                                </div>
                               )}
                             </div>
                           </div>
@@ -552,12 +642,210 @@ export default function Agendas() {
         </div>
       </main>
 
+      {/* ================= MODAL DE DÍA COMPLETO (VISUALIZAR TODAS LAS CITAS) ================= */}
+      {diaSeleccionado && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-[#111111] w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616] shrink-0">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CalendarIcon className="text-[#0081a7]" size={20}/> 
+                <span className="capitalize">{diaSeleccionado.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+              </h2>
+              <button onClick={() => setDiaSeleccionado(null)} className="p-2 text-slate-400 hover:text-rose-500 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-full transition-colors"><X size={18} /></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+               {getCitasParaDia(diaSeleccionado).length === 0 ? (
+                  <div className="text-center text-slate-500 dark:text-slate-400 py-8 flex flex-col items-center">
+                    <Clock size={40} className="mb-3 opacity-20" />
+                    <p className="font-medium text-sm">No hay consultas pautadas para este día.</p>
+                  </div>
+               ) : (
+                  getCitasParaDia(diaSeleccionado).map(c => (
+                      <div 
+                        key={c.id} 
+                        onClick={() => { setDiaSeleccionado(null); openCitaDetails(c); }}
+                        className={`bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl p-4 shadow-sm hover:shadow-md transition-transform hover:-translate-y-1 cursor-pointer relative overflow-hidden ${getStatusColor(c)}`}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`w-3 h-3 rounded-full ${getStatusColorSolid(c)}`}></div>
+                          <span className="text-sm font-black text-slate-700 dark:text-slate-200">{formatHora(c.fecha_consulta)}</span>
+                          <span className="ml-auto text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/50 dark:bg-black/20 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-white/5 shadow-sm">{getStatusText(c)}</span>
+                        </div>
+                        <p className="text-base font-black text-slate-900 dark:text-white truncate">{c.pacientes?.nombres} {c.pacientes?.apellidos}</p>
+                        <p className="text-xs text-slate-500 mt-1 truncate"><IdCard size={12} className="inline mr-1 opacity-70"/> C.I: {c.pacientes?.cedula || 'No registrada'}</p>
+                        {c.motivo && <p className="text-[12px] font-medium text-slate-500 dark:text-slate-400 mt-3 bg-slate-50 dark:bg-white/5 p-2.5 rounded-lg leading-snug">{c.motivo}</p>}
+                      </div>
+                  ))
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL AGENDAR NUEVA CITA CON BUSCADORES INTELIGENTES ================= */}
+      {showAgendarModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white dark:bg-[#111111] w-full max-w-xl rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col overflow-y-auto max-h-[90vh] custom-scrollbar">
+            
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616] sticky top-0 z-10">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CalendarIcon className="text-[#0081a7]" size={20}/> Agendar Nueva Consulta
+              </h2>
+              <button onClick={() => setShowAgendarModal(false)} className="p-2 text-slate-400 hover:text-rose-500 bg-white dark:bg-black/50 border border-slate-200 dark:border-white/10 rounded-full transition-colors"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleAgendarCita} className="p-6 space-y-5">
+              
+              {/* === BUSCADOR PREDICTIVO DE PACIENTES === */}
+              <div className="relative">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Buscar Paciente *</label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text"
+                    placeholder="Ej. Nombre, apellido o número de cédula..."
+                    value={busquedaPaciente}
+                    onChange={(e) => {
+                      setBusquedaPaciente(e.target.value);
+                      setMostrarDropdownPac(true);
+                      setNuevaCita({...nuevaCita, id_paciente: ''}); // Resetea la ID si altera el texto
+                    }}
+                    onFocus={() => setMostrarDropdownPac(true)}
+                    onBlur={() => setTimeout(() => setMostrarDropdownPac(false), 200)}
+                    required={!nuevaCita.id_paciente}
+                    className={`w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border ${nuevaCita.id_paciente ? 'border-emerald-500/50 focus:ring-emerald-500' : 'border-slate-200 dark:border-white/10 focus:ring-[#0081a7]'} rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 transition-all`}
+                  />
+                </div>
+                
+                {/* Lista Desplegable de Pacientes */}
+                {mostrarDropdownPac && busquedaPaciente.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl max-h-56 overflow-y-auto custom-scrollbar">
+                    {pacientesFiltrados.length > 0 ? (
+                      pacientesFiltrados.map(p => (
+                        <div 
+                          key={p.id} 
+                          onMouseDown={() => {
+                            setNuevaCita({...nuevaCita, id_paciente: p.id});
+                            setBusquedaPaciente(`${p.nombres} ${p.apellidos} - C.I: ${p.cedula || 'N/A'}`);
+                            setMostrarDropdownPac(false);
+                          }}
+                          className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer border-b last:border-0 border-slate-100 dark:border-white/5 transition-colors"
+                        >
+                          <p className="text-sm font-bold text-slate-800 dark:text-white">{p.nombres} {p.apellidos}</p>
+                          <p className="text-xs font-medium text-slate-500 mt-0.5">C.I: {p.cedula || 'No registrada'}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-4 text-center text-sm font-medium text-slate-500">No se encontraron resultados.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* === BUSCADOR PREDICTIVO DE MÉDICOS (Solo si no es especialista) === */}
+              {!esEspecialista && (
+                <div className="relative">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Buscar Médico Especialista *</label>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="Nombre del doctor..."
+                      value={busquedaMedico}
+                      onChange={(e) => {
+                        setBusquedaMedico(e.target.value);
+                        setMostrarDropdownMed(true);
+                        setNuevaCita({...nuevaCita, id_medico: ''}); 
+                      }}
+                      onFocus={() => setMostrarDropdownMed(true)}
+                      onBlur={() => setTimeout(() => setMostrarDropdownMed(false), 200)}
+                      required={!nuevaCita.id_medico}
+                      className={`w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border ${nuevaCita.id_medico ? 'border-emerald-500/50 focus:ring-emerald-500' : 'border-slate-200 dark:border-white/10 focus:ring-[#0081a7]'} rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 transition-all`}
+                    />
+                  </div>
+
+                  {/* Lista Desplegable de Médicos */}
+                  {mostrarDropdownMed && busquedaMedico.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-[#16161a] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
+                      {medicosFiltrados.length > 0 ? (
+                        medicosFiltrados.map(m => (
+                          <div 
+                            key={m.id_auth} 
+                            onMouseDown={() => {
+                              setNuevaCita({...nuevaCita, id_medico: m.id_auth});
+                              setBusquedaMedico(`Dr(a). ${m.nombres} ${m.apellidos}`);
+                              setMostrarDropdownMed(false);
+                            }}
+                            className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer border-b last:border-0 border-slate-100 dark:border-white/5 transition-colors"
+                          >
+                            <p className="text-sm font-bold text-slate-800 dark:text-white">Dr(a). {m.nombres} {m.apellidos}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-4 py-4 text-center text-sm font-medium text-slate-500">No se encontraron doctores.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Fecha *</label>
+                  <input 
+                    type="date" 
+                    name="fecha" 
+                    value={nuevaCita.fecha} 
+                    onChange={handleNuevaCitaChange} 
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Hora *</label>
+                  <input 
+                    type="time" 
+                    name="hora" 
+                    value={nuevaCita.hora} 
+                    onChange={handleNuevaCitaChange} 
+                    required
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Motivo de Consulta (Opcional)</label>
+                <textarea 
+                  name="motivo" 
+                  value={nuevaCita.motivo} 
+                  onChange={handleNuevaCitaChange} 
+                  rows="2"
+                  placeholder="Ej. Chequeo general, lectura de exámenes..."
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl text-sm font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-[#0081a7] transition-all resize-none"
+                ></textarea>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-white/5">
+                <button type="button" onClick={() => setShowAgendarModal(false)} className="px-5 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={agendando} className="flex items-center gap-2 bg-[#0081a7] hover:bg-[#006b8a] text-white px-6 py-2.5 rounded-xl font-bold shadow-md transition-all disabled:opacity-50">
+                  {agendando ? 'Guardando...' : <><Save size={18}/> Agendar Cita</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL DETALLE Y CONTROL DE CITA ================= */}
       {selectedCita && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
-           <div className="bg-white dark:bg-[#111111] w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+           <div className="bg-white dark:bg-[#111111] w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar">
               
-              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616]">
+              <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-[#161616] sticky top-0 z-10">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Clock className="text-cyan-500" size={20}/> Detalle de la Cita
                 </h2>
@@ -570,13 +858,13 @@ export default function Agendas() {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paciente</p>
-                    <p className="text-lg font-black text-slate-900 dark:text-white">{selectedCita.pacientes?.nombres} {selectedCita.pacientes?.apellidos}</p>
-                    <p className="text-sm font-medium text-slate-500">C.I: {selectedCita.pacientes?.cedula}</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white leading-tight">{selectedCita.pacientes?.nombres} {selectedCita.pacientes?.apellidos}</p>
+                    <p className="text-sm font-medium text-slate-500 mt-1">C.I: {selectedCita.pacientes?.cedula || 'N/A'}</p>
                   </div>
                   
                   <button 
                     onClick={() => handleWhatsApp(selectedCita)}
-                    className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebd53] text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md transition-transform hover:-translate-y-0.5"
+                    className="flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebd53] text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md transition-transform hover:-translate-y-0.5 shrink-0 ml-2"
                   >
                     <MessageCircle size={16} /> WhatsApp
                   </button>
@@ -602,7 +890,7 @@ export default function Agendas() {
 
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Motivo / Notas</p>
-                  <div className="bg-slate-50 dark:bg-[#1a1a1a] p-4 rounded-xl border border-slate-200 dark:border-white/5 text-sm text-slate-600 dark:text-slate-300 min-h-[80px]">
+                  <div className="bg-slate-50 dark:bg-[#1a1a1a] p-4 rounded-xl border border-slate-200 dark:border-white/5 text-sm font-medium text-slate-600 dark:text-slate-300 min-h-[80px]">
                     {selectedCita.motivo || 'Sin notas adicionales.'}
                   </div>
                 </div>
@@ -657,7 +945,8 @@ export default function Agendas() {
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3f3f46; }
       `}</style>
     </div>
   );

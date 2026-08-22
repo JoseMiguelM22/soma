@@ -84,7 +84,7 @@ export default function Perfil() {
 
   // ================= ACTUALIZAR DATOS PERSONALES =================
   const handleActualizarDatos = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setGuardandoDatos(true);
     try {
       const { error } = await supabase.from('usuarios').update({
@@ -112,17 +112,29 @@ export default function Perfil() {
 
   // ================= ACTUALIZAR CORREO =================
   const handleActualizarCorreo = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+
+    const correoLimpio = nuevoCorreo.trim();
+
+    if (!correoLimpio) {
+      showToast("Por favor, ingresa un correo válido.", "error");
+      return;
+    }
+
     setGuardandoCorreo(true);
+
     try {
-      const { error: authError } = await supabase.auth.updateUser({ email: nuevoCorreo });
+      const { error: authError } = await supabase.auth.updateUser({ email: correoLimpio });
       if (authError) throw authError;
 
-      const { error: dbError } = await supabase.from('usuarios').update({ correo: nuevoCorreo }).eq('id', userData.id);
+      const { error: dbError } = await supabase.from('usuarios')
+        .update({ correo: correoLimpio })
+        .eq('id', userData.id);
       if (dbError) throw dbError;
 
-      showToast("Correo actualizado. (Si Supabase pide confirmación, revisa tu bandeja)", "success");
-      setUserData({ ...userData, correo: nuevoCorreo });
+      showToast("Correo actualizado. (Revisa tu bandeja de entrada para confirmar)", "success");
+      setUserData({ ...userData, correo: correoLimpio });
+      
     } catch (error) {
       showToast("Error al actualizar correo: " + error.message, "error");
     } finally {
@@ -132,7 +144,7 @@ export default function Perfil() {
 
   // ================= ACTUALIZAR CONTRASEÑA =================
   const handleActualizarClave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (nuevaClave.length < 6) return showToast("La contraseña debe tener al menos 6 caracteres.", "error");
     
     setGuardandoClave(true);
@@ -287,37 +299,44 @@ export default function Perfil() {
 
               {/* TARJETAS DE SEGURIDAD */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                {/* CAMBIAR CORREO */}
+
+                {/* CAMBIAR CORREO (AHORA ES UN DIV) */}
                 <div className="bg-white dark:bg-[#111111] p-8 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-xl">
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-white/5 pb-4">
                     <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 rounded-xl"><Mail size={20} /></div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Cambiar Correo</h3>
                   </div>
-                  <form onSubmit={handleActualizarCorreo} className="space-y-5">
+                  
+                  <div className="space-y-5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Nuevo Correo Electrónico</label>
                       <input 
                         type="email" 
                         value={nuevoCorreo} 
                         onChange={(e) => setNuevoCorreo(e.target.value)}
-                        required
+                        autoComplete="off"
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-[#0081a7] text-sm font-medium text-slate-900 dark:text-white transition-all"
                       />
                     </div>
-                    <button type="submit" disabled={guardandoCorreo || nuevoCorreo === userData?.correo} className="w-full flex items-center justify-center gap-2 py-3 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50">
+                    <button 
+                      type="button" 
+                      onClick={handleActualizarCorreo}
+                      disabled={guardandoCorreo || nuevoCorreo === userData?.correo || !nuevoCorreo.trim()} 
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-[#0081a7] hover:bg-[#006b8a] text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50"
+                    >
                       {guardandoCorreo ? 'Guardando...' : <><Save size={18} /> Actualizar Correo</>}
                     </button>
-                  </form>
+                  </div>
                 </div>
 
-                {/* CAMBIAR CONTRASEÑA */}
+                {/* CAMBIAR CONTRASEÑA (AHORA ES UN DIV) */}
                 <div className="bg-white dark:bg-[#111111] p-8 rounded-[2rem] border border-slate-200 dark:border-white/5 shadow-xl">
                   <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-white/5 pb-4">
                     <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500 rounded-xl"><Lock size={20} /></div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Cambiar Contraseña</h3>
                   </div>
-                  <form onSubmit={handleActualizarClave} className="space-y-5">
+
+                  <div className="space-y-5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Nueva Contraseña</label>
                       <input 
@@ -325,14 +344,19 @@ export default function Perfil() {
                         value={nuevaClave} 
                         onChange={(e) => setNuevaClave(e.target.value)}
                         placeholder="Mínimo 6 caracteres"
-                        required
+                        autoComplete="new-password"
                         className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1a1a1a] border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-medium text-slate-900 dark:text-white transition-all"
                       />
                     </div>
-                    <button type="submit" disabled={guardandoClave || nuevaClave.length < 6} className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50">
+                    <button 
+                      type="button"
+                      onClick={handleActualizarClave}
+                      disabled={guardandoClave || nuevaClave.length < 6} 
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition-all disabled:opacity-50"
+                    >
                       {guardandoClave ? 'Guardando...' : <><Save size={18} /> Actualizar Contraseña</>}
                     </button>
-                  </form>
+                  </div>
                 </div>
 
               </div>
